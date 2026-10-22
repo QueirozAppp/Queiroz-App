@@ -3,7 +3,11 @@ package com.example.core.data
 import com.example.core.firebase.FirebaseProvider
 import com.example.core.model.UserProfile
 import com.example.core.model.UserRole
+import com.google.firebase.auth.AuthResult
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -53,85 +57,123 @@ class AuthRepository {
             val isPrimaryAdmin = trimmedEmail.equals("aplicativoqueirozapp@gmail.com", ignoreCase = true)
 
             if (isPrimaryAdmin) {
-                val fallbackUid = auth?.currentUser?.uid ?: "admin_primary_uid"
-                val primaryAdmin = UserProfile(
-                    uid = fallbackUid,
-                    name = "Administrador Geral",
-                    email = trimmedEmail,
-                    role = UserRole.ADMIN,
-                    storeId = selectedStoreId.ifBlank { "LOJA_01" },
-                    sectorId = "Geral",
-                    active = true,
-                    createdAt = System.currentTimeMillis(),
-                    mustChangePassword = false
-                )
-
-                if (firebaseAuth != null) {
-                    try {
-                        val authResult = firebaseAuth.signInWithEmailAndPassword(trimmedEmail, password).await()
-                        val realUid = authResult.user?.uid ?: fallbackUid
-                        val updatedAdmin = primaryAdmin.copy(uid = realUid)
-                        if (db != null) {
-                            try { db.collection("users").document(realUid).set(updatedAdmin) } catch (_: Exception) {}
-                        }
-                        return Result.success(updatedAdmin)
-                    } catch (_: Exception) {
-                        try {
-                            val createResult = firebaseAuth.createUserWithEmailAndPassword(trimmedEmail, password).await()
-                            val realUid = createResult.user?.uid ?: fallbackUid
-                            val updatedAdmin = primaryAdmin.copy(uid = realUid)
-                            if (db != null) {
-                                try { db.collection("users").document(realUid).set(updatedAdmin) } catch (_: Exception) {}
-                            }
-                            return Result.success(updatedAdmin)
-                        } catch (_: Exception) {
-                            if (db != null) {
-                                try { db.collection("users").document(primaryAdmin.uid).set(primaryAdmin) } catch (_: Exception) {}
-                            }
-                            return Result.success(primaryAdmin)
-                        }
+                // Autenticação oficial no Firebase Auth para o admin raiz
+                val authResult: AuthResult = try {
+                    withTimeout(15000L) {
+                        firebaseAuth.signInWithEmailAndPassword(trimmedEmail, password).await()
                     }
-                } else {
-                    if (db != null) {
-                        try { db.collection("users").document(primaryAdmin.uid).set(primaryAdmin) } catch (_: Exception) {}
+                } catch (authEx: Exception) {
+                    val isUserNotFound = authEx is com.google.firebase.auth.FirebaseAuthInvalidUserException ||
+                            authEx.message?.contains("no user record", ignoreCase = true) == true ||
+                            authEx.message?.contains("user-not-found", ignoreCase = true) == true
+                    if (isUserNotFound) {
+                        // Se usuário não existe no Auth, cria automaticamente no Auth
+                        withTimeout(15000L) {
+                            firebaseAuth.createUserWithEmailAndPassword(trimmedEmail, password).await()
+                        }
+                    } else {
+                        throw authEx
                     }
-                    return Result.success(primaryAdmin)
                 }
-            }
 
-            // 1. Tenta autenticação no Firebase Auth com timeout seguro de 4s para evitar congelamento
-            val firebaseUser = withTimeoutOrNull(4000L) {
-                val authResult = firebaseAuth.signInWithEmailAndPassword(trimmedEmail, password).await()
-                authResult.user
-            } ?: return Result.failure(IllegalStateException("Tempo de resposta excedido. Verifique sua conexão com o servidor Firebase."))
+                val realUid = authResult.user?.uid ?: throw IllegalStateException("UID não retornado pelo Firebase Authentication.")
 
-            val uid = firebaseUser.uid
-
-            // 2. Para demais usuários (Avarista/Líder): Consulta do perfil no Cloud Firestore (users/{uid})
-            val docSnap = withTimeoutOrNull(4000L) {
-                try {
-                    db.collection("users").document(uid).get().await()
+                // Verifica se já existe documento salvo no Firestore para preservar createdAt original
+                val existingDoc = try {
+                    withTimeoutOrNull(10000L) {
+                        db.collection("users").document(realUid).get().await()
+                    }
                 } catch (_: Exception) {
                     null
                 }
-            } ?: return Result.failure(SecurityException("Não foi possível carregar o perfil do usuário no servidor."))
+
+                val primaryAdmin = if (existingDoc != null && existingDoc.exists()) {
+                    val existing = existingDoc.toObject(UserProfile::class.java)
+                    UserProfile(
+                        uid = realUid,
+                        name = existing?.name?.ifBlank { "Administrador Geral" } ?: "Administrador Geral",
+                        email = trimmedEmail,
+                        role = UserRole.ADMIN,
+                        storeId = selectedStoreId.ifBlank { existing?.storeId?.ifBlank { "LOJA_01" } ?: "LOJA_01" },
+                        sectorId = "Geral",
+                        active = true,
+                        createdAt = existing?.createdAt ?: System.currentTimeMillis(),
+                        mustChangePassword = false
+                    )
+                } else {
+                    UserProfile(
+                        uid = realUid,
+                        name = "Administrador Geral",
+                        email = trimmedEmail,
+                        role = UserRole.ADMIN,
+                        storeId = selectedStoreId.ifBlank { "LOJA_01" },
+                        sectorId = "Geral",
+                        active = true,
+                        createdAt = System.currentTimeMillis(),
+                        mustChangePassword = false
+                    )
+                }
+
+                // Grava e AWAITA a persistência do perfil do admin no Firestore
+                try {
+                    withTimeout(15000L) {
+                        db.collection("users").document(realUid).set(primaryAdmin).await()
+                    }
+                } catch (fsEx: Exception) {
+                    android.util.Log.e("AuthRepository", "Aviso ao salvar users/$realUid: ${fsEx.message}", fsEx)
+                }
+
+                return Result.success(primaryAdmin)
+            }
+
+            // 1. Autenticação dos demais usuários operacionais (Avarista, Líder, Admin secundário)
+            val authUser = try {
+                withTimeout(15000L) {
+                    val res = firebaseAuth.signInWithEmailAndPassword(trimmedEmail, password).await()
+                    res.user
+                }
+            } catch (authEx: Exception) {
+                throw authEx
+            } ?: return Result.failure(IllegalStateException("Usuário não retornado pelo servidor de autenticação."))
+
+            val uid = authUser.uid
+
+            // 2. Consulta do perfil no Cloud Firestore (users/{uid}) com timeout adequado (15s)
+            val docSnap = try {
+                withTimeout(15000L) {
+                    db.collection("users").document(uid).get().await()
+                }
+            } catch (toEx: kotlinx.coroutines.TimeoutCancellationException) {
+                android.util.Log.e("AuthRepository", "Timeout ao buscar users/$uid", toEx)
+                firebaseAuth.signOut()
+                return Result.failure(IllegalStateException("Tempo limite excedido ao conectar ao Firestore. Verifique sua conexão com a internet."))
+            } catch (fsEx: Exception) {
+                android.util.Log.e("AuthRepository", "Erro no Firestore ao buscar users/$uid: ${fsEx.message}", fsEx)
+                firebaseAuth.signOut()
+                return Result.failure(SecurityException("Falha ao recuperar perfil do usuário no servidor: ${fsEx.localizedMessage}"))
+            }
 
             if (!docSnap.exists()) {
                 firebaseAuth.signOut()
-                return Result.failure(SecurityException("Perfil de usuário não encontrado no sistema (coleção 'users')."))
+                return Result.failure(SecurityException("Perfil de usuário não encontrado no Firestore (coleção 'users'). Solicite o recadastramento ao administrador."))
             }
 
             val userProfile = docSnap.toObject(UserProfile::class.java)?.copy(uid = uid)
-                ?: return Result.failure(SecurityException("Erro ao processar dados do perfil."))
+                ?: run {
+                    firebaseAuth.signOut()
+                    return Result.failure(SecurityException("Erro ao processar dados do perfil do usuário."))
+                }
 
             if (!userProfile.active) {
                 firebaseAuth.signOut()
                 return Result.failure(SecurityException("Este usuário está desativado no sistema. Contate o administrador."))
             }
 
-            if (userProfile.storeId != selectedStoreId) {
+            // Usuários do tipo ADMIN têm acesso global a qualquer loja selecionada;
+            // Usuários operacionais (Avarista / Líder) devem ter vínculo com a loja selecionada
+            if (userProfile.role != UserRole.ADMIN && userProfile.storeId != selectedStoreId) {
                 firebaseAuth.signOut()
-                return Result.failure(SecurityException("Este usuário não possui acesso à loja selecionada."))
+                return Result.failure(SecurityException("Este usuário não possui acesso à loja selecionada (${selectedStoreId}). Loja vinculada: ${userProfile.storeId}."))
             }
 
             Result.success(userProfile)
@@ -140,6 +182,7 @@ class AuthRepository {
             val rawMsg = e.localizedMessage ?: e.message ?: ""
             val message = when {
                 e is SecurityException -> e.message ?: "Acesso negado."
+                e is IllegalStateException -> e.message ?: "Erro operacional."
                 rawMsg.contains("CONFIGURATION_NOT_FOUND", ignoreCase = true) ->
                     "Configuração do Firebase Auth pendente: Ative o provedor 'E-mail/Senha' em Firebase Console -> Authentication -> Sign-in method (Projeto: appqueirozavaria)."
                 rawMsg.contains("password", ignoreCase = true) ||

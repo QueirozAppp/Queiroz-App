@@ -96,13 +96,24 @@ class AdminUserRepository(
             val secondaryAuth = FirebaseAuth.getInstance(secondaryApp)
 
             // Criar usuário no Auth
-            val authResult = kotlinx.coroutines.withTimeoutOrNull(5000L) {
-                secondaryAuth.createUserWithEmailAndPassword(email.trim(), pass).await()
-            } ?: throw IllegalStateException("Tempo limite de comunicação com o serviço de autenticação.")
-            val newUid = authResult.user?.uid ?: throw IllegalStateException("UID não retornado pelo Auth.")
-
-            // Encerrar sessão secundária
-            secondaryAuth.signOut()
+            val newUid: String = try {
+                val authResult = kotlinx.coroutines.withTimeoutOrNull(15000L) {
+                    secondaryAuth.createUserWithEmailAndPassword(email.trim(), pass).await()
+                } ?: throw IllegalStateException("Tempo limite de 15 segundos ao comunicar com o Firebase Authentication.")
+                authResult.user?.uid ?: throw IllegalStateException("UID não retornado pelo Firebase Authentication.")
+            } catch (collision: com.google.firebase.auth.FirebaseAuthUserCollisionException) {
+                // Se o usuário já foi criado no Auth (ex.: falha anterior de gravação no Firestore), autentica para recuperar o UID
+                try {
+                    val signInResult = kotlinx.coroutines.withTimeoutOrNull(15000L) {
+                        secondaryAuth.signInWithEmailAndPassword(email.trim(), pass).await()
+                    } ?: throw IllegalStateException("Tempo limite ao verificar conta existente no Firebase.")
+                    signInResult.user?.uid ?: throw IllegalStateException("UID do usuário existente não encontrado.")
+                } catch (signInErr: Exception) {
+                    throw IllegalStateException("Este e-mail (${email.trim()}) já está cadastrado no Firebase Authentication com outra credencial. Solicite a redefinição de senha ou utilize outro e-mail.")
+                }
+            } finally {
+                try { secondaryAuth.signOut() } catch (_: Exception) {}
+            }
 
             // Criar perfil no Firestore
             val newProfile = UserProfile(
@@ -117,29 +128,39 @@ class AdminUserRepository(
                 mustChangePassword = true
             )
 
-            kotlinx.coroutines.withTimeoutOrNull(5000L) {
-                db.collection("users").document(newUid).set(newProfile).await()
-            } ?: throw IllegalStateException("Tempo limite ao gravar perfil no Firestore.")
+            try {
+                kotlinx.coroutines.withTimeout(15000L) {
+                    db.collection("users").document(newUid).set(newProfile).await()
+                }
+            } catch (t: kotlinx.coroutines.TimeoutCancellationException) {
+                throw IllegalStateException("Tempo limite de 15 segundos ao gravar o perfil no Firestore. O usuário foi registrado no Auth, tente salvar novamente.")
+            } catch (dbEx: Exception) {
+                throw IllegalStateException("Erro ao gravar perfil no Firestore: ${dbEx.localizedMessage}")
+            }
 
-            // Registrar evento de auditoria
-            val currentAdminUid = try { FirebaseProvider.getAuthOrNull()?.currentUser?.uid } catch (_: Exception) { null } ?: "admin_system"
-            auditRepository.logEvent(
-                action = AuditAction.USER_CREATED,
-                entityType = AuditEntityType.USER,
-                entityId = newUid,
-                userId = currentAdminUid,
-                userName = "Administrador",
-                userRole = "ADMIN",
-                storeId = storeId,
-                sectorId = sectorId,
-                description = "Usuário ${newProfile.name} (${newProfile.email}) criado com papel ${newProfile.role.name}",
-                metadata = mapOf(
-                    "createdUid" to newUid,
-                    "role" to role.name,
-                    "storeId" to storeId,
-                    "sectorId" to sectorId
+            // Registrar evento de auditoria de forma não-bloqueante
+            try {
+                val currentAdminUid = try { FirebaseProvider.getAuthOrNull()?.currentUser?.uid } catch (_: Exception) { null } ?: "admin_system"
+                auditRepository.logEvent(
+                    action = AuditAction.USER_CREATED,
+                    entityType = AuditEntityType.USER,
+                    entityId = newUid,
+                    userId = currentAdminUid,
+                    userName = "Administrador",
+                    userRole = "ADMIN",
+                    storeId = storeId,
+                    sectorId = sectorId,
+                    description = "Usuário ${newProfile.name} (${newProfile.email}) criado com papel ${newProfile.role.name}",
+                    metadata = mapOf(
+                        "createdUid" to newUid,
+                        "role" to role.name,
+                        "storeId" to storeId,
+                        "sectorId" to sectorId
+                    )
                 )
-            )
+            } catch (auditErr: Exception) {
+                android.util.Log.w("AdminUserRepo", "Falha ao gravar evento de auditoria: ${auditErr.message}")
+            }
 
             Result.success(newUid)
         } catch (e: Exception) {

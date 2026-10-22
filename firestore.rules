@@ -16,16 +16,20 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isAuthenticated() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-        getUserData().role == 'ADMIN' &&
-        getUserData().active == true;
+      return isAuthenticated() && (
+        request.auth.token.email == 'aplicativoqueirozapp@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         getUserData().role == 'ADMIN' &&
+         getUserData().active == true)
+      );
     }
 
     function isSystemActive() {
-      return isAuthenticated() &&
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        getUserData().active == true;
+      return isAuthenticated() && (
+        request.auth.token.email == 'aplicativoqueirozapp@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         getUserData().active == true)
+      );
     }
 
     // Helper function to verify that historical product fields inside an item map are unchanged
@@ -176,14 +180,14 @@ service cloud.firestore {
 
     // Stores collection rules (Etapa 11)
     match /stores/{storeId} {
-      allow read: if isSystemActive();
+      allow read: if true;
       allow create, update: if isAdmin();
       allow delete: if false;
     }
 
     // Sectors collection rules (Etapa 11)
     match /sectors/{sectorId} {
-      allow read: if isSystemActive();
+      allow read: if true;
       allow create, update: if isAdmin();
       allow delete: if false;
     }
@@ -283,10 +287,10 @@ service cloud.firestore {
             isAdmin() && request.resource.data.userRole == 'ADMIN' &&
             (
               // Entity existence checks for updates and status changes
-              (!request.resource.data.action in ['USER_ACTIVATED', 'USER_DEACTIVATED', 'USER_STORE_CHANGED', 'USER_SECTOR_CHANGED'] || exists(/databases/$(database)/documents/users/$(request.resource.data.entityId))) &&
-              (!request.resource.data.action in ['STORE_ACTIVATED', 'STORE_DEACTIVATED', 'STORE_UPDATED'] || exists(/databases/$(database)/documents/stores/$(request.resource.data.entityId))) &&
-              (!request.resource.data.action in ['SECTOR_ACTIVATED', 'SECTOR_DEACTIVATED', 'SECTOR_UPDATED'] || exists(/databases/$(database)/documents/sectors/$(request.resource.data.entityId))) &&
-              (!request.resource.data.action in ['PRODUCT_ACTIVATED', 'PRODUCT_DEACTIVATED', 'PRODUCT_UPDATED'] || exists(/databases/$(database)/documents/products/$(request.resource.data.entityId)))
+              (!(request.resource.data.action in ['USER_ACTIVATED', 'USER_DEACTIVATED', 'USER_STORE_CHANGED', 'USER_SECTOR_CHANGED']) || exists(/databases/$(database)/documents/users/$(request.resource.data.entityId))) &&
+              (!(request.resource.data.action in ['STORE_ACTIVATED', 'STORE_DEACTIVATED', 'STORE_UPDATED']) || exists(/databases/$(database)/documents/stores/$(request.resource.data.entityId))) &&
+              (!(request.resource.data.action in ['SECTOR_ACTIVATED', 'SECTOR_DEACTIVATED', 'SECTOR_UPDATED']) || exists(/databases/$(database)/documents/sectors/$(request.resource.data.entityId))) &&
+              (!(request.resource.data.action in ['PRODUCT_ACTIVATED', 'PRODUCT_DEACTIVATED', 'PRODUCT_UPDATED']) || exists(/databases/$(database)/documents/products/$(request.resource.data.entityId)))
             )
           ) ||
           // 2. SETOR_LEADER: Can ONLY record WITHDRAWAL_REQUEST_CREATED for their own store and sector

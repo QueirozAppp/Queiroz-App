@@ -88,6 +88,7 @@ fun HomeAuthenticatedScreen(
     onOpenOperationalCenter: (() -> Unit)? = null,
     onOpenReports: (() -> Unit)? = null,
     onOpenAdminUsers: (() -> Unit)? = null,
+    onOpenStores: (() -> Unit)? = null,
     onOpenProducts: (() -> Unit)? = null,
     onOpenScanner: (() -> Unit)? = null,
     onOpenMyRequests: (() -> Unit)? = null,
@@ -595,6 +596,17 @@ fun HomeAuthenticatedScreen(
                             iconColor = AppColors.Secondary,
                             onClick = onOpenAdminUsers,
                             modifier = Modifier.testTag("btn_open_admin_users")
+                        )
+                    }
+
+                    if (onOpenStores != null) {
+                        ActionCardButton(
+                            title = "Gerenciar Lojas e Setores",
+                            subtitle = "Cadastro e edição de unidades filiais e setores",
+                            icon = Icons.Default.Store,
+                            iconColor = Color(0xFF0D9488),
+                            onClick = onOpenStores,
+                            modifier = Modifier.testTag("btn_open_stores")
                         )
                     }
 

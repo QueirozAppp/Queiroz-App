@@ -11,11 +11,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+import com.example.core.data.StoreSectorRepository
+
 /**
  * ViewModel responsável pela lógica de autenticação, diagnósticos do Firebase e redefinição de senha.
  */
 class LoginViewModel(
-    private val authRepository: AuthRepository = AuthRepository()
+    private val authRepository: AuthRepository = AuthRepository(),
+    private val storeSectorRepository: StoreSectorRepository = StoreSectorRepository()
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState())
@@ -23,6 +26,32 @@ class LoginViewModel(
 
     init {
         checkExistingSession()
+        observeStores()
+    }
+
+    private fun observeStores() {
+        viewModelScope.launch {
+            try {
+                storeSectorRepository.getStoresFlow().collect { stores ->
+                    val activeStores = stores.filter { it.active }
+                    _uiState.update { current ->
+                        val updatedStores = if (activeStores.isNotEmpty()) activeStores else current.availableStores
+                        val currentSelected = current.selectedStoreId
+                        val finalSelected = if (currentSelected.isNotBlank() && updatedStores.any { it.id == currentSelected }) {
+                            currentSelected
+                        } else {
+                            currentSelected.ifBlank { updatedStores.firstOrNull()?.id ?: "" }
+                        }
+                        current.copy(
+                            availableStores = updatedStores,
+                            selectedStoreId = finalSelected
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("LoginViewModel", "Erro ao carregar lojas em tempo real: ${e.message}")
+            }
+        }
     }
 
     fun loadDiagnostics(context: Context) {

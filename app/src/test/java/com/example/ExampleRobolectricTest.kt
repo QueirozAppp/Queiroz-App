@@ -39,10 +39,10 @@ import org.robolectric.annotation.Config
 class ExampleRobolectricTest {
 
     @Test
-    fun `read app_name string from context matches Queiroz Avaria`() {
+    fun `read app_name string from context matches QRZ Stock`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val appName = context.getString(R.string.app_name)
-        assertEquals("Queiroz Avaria", appName)
+        assertEquals("QRZ Stock", appName)
     }
 
     @Test
@@ -98,7 +98,7 @@ class ExampleRobolectricTest {
         val viewModel = FoundationViewModel(application)
         val state = viewModel.uiState.value
 
-        assertEquals("Queiroz Avaria", state.appTitle)
+        assertEquals("QRZ Stock", state.appTitle)
         assertNotNull(state.diagnostics)
         assertEquals(3, state.plannedRoles.size)
         assertTrue(state.plannedRoles.contains(UserRole.ADMIN))

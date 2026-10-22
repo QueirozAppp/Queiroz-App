@@ -101,24 +101,32 @@ class StoreSectorRepository(
                 createdAt = if (store.createdAt == 0L) now else store.createdAt,
                 updatedAt = now
             )
-            db.collection("stores").document(id).set(finalStore).await()
+            withTimeout(15000L) {
+                db.collection("stores").document(id).set(finalStore).await()
+            }
 
-            val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: "admin_system"
-            val isNew = store.id.isBlank() || store.createdAt == 0L
-            val action = if (isNew) AuditAction.STORE_CREATED else if (!finalStore.active) AuditAction.STORE_DEACTIVATED else AuditAction.STORE_UPDATED
-            auditRepository.logEvent(
-                action = action,
-                entityType = AuditEntityType.STORE,
-                entityId = id,
-                userId = currentUid,
-                userName = "Administrador",
-                userRole = "ADMIN",
-                storeId = id,
-                description = "Loja ${finalStore.name} (${finalStore.code}) salva",
-                metadata = mapOf("storeName" to finalStore.name, "active" to "${finalStore.active}")
-            )
+            try {
+                val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: "admin_system"
+                val isNew = store.id.isBlank() || store.createdAt == 0L
+                val action = if (isNew) AuditAction.STORE_CREATED else if (!finalStore.active) AuditAction.STORE_DEACTIVATED else AuditAction.STORE_UPDATED
+                auditRepository.logEvent(
+                    action = action,
+                    entityType = AuditEntityType.STORE,
+                    entityId = id,
+                    userId = currentUid,
+                    userName = "Administrador",
+                    userRole = "ADMIN",
+                    storeId = id,
+                    description = "Loja ${finalStore.name} (${finalStore.code}) salva",
+                    metadata = mapOf("storeName" to finalStore.name, "active" to "${finalStore.active}")
+                )
+            } catch (auditEx: Exception) {
+                android.util.Log.w("StoreSectorRepo", "Falha ao gravar log de auditoria da loja: ${auditEx.message}")
+            }
 
             Result.success(Unit)
+        } catch (e: TimeoutCancellationException) {
+            Result.failure(IllegalStateException("Tempo limite de 15 segundos ao gravar a loja no Firestore. Verifique sua conexão com a internet."))
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -136,25 +144,33 @@ class StoreSectorRepository(
                 createdAt = if (sector.createdAt == 0L) now else sector.createdAt,
                 updatedAt = now
             )
-            db.collection("sectors").document(id).set(finalSector).await()
+            withTimeout(15000L) {
+                db.collection("sectors").document(id).set(finalSector).await()
+            }
 
-            val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: "admin_system"
-            val isNew = sector.id.isBlank() || sector.createdAt == 0L
-            val action = if (isNew) AuditAction.SECTOR_CREATED else if (!finalSector.active) AuditAction.SECTOR_DEACTIVATED else AuditAction.SECTOR_UPDATED
-            auditRepository.logEvent(
-                action = action,
-                entityType = AuditEntityType.SECTOR,
-                entityId = id,
-                userId = currentUid,
-                userName = "Administrador",
-                userRole = "ADMIN",
-                storeId = finalSector.storeId,
-                sectorId = id,
-                description = "Setor ${finalSector.name} (${finalSector.code}) salvo para a loja ${finalSector.storeId}",
-                metadata = mapOf("sectorName" to finalSector.name, "storeId" to finalSector.storeId, "active" to "${finalSector.active}")
-            )
+            try {
+                val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: "admin_system"
+                val isNew = sector.id.isBlank() || sector.createdAt == 0L
+                val action = if (isNew) AuditAction.SECTOR_CREATED else if (!finalSector.active) AuditAction.SECTOR_DEACTIVATED else AuditAction.SECTOR_UPDATED
+                auditRepository.logEvent(
+                    action = action,
+                    entityType = AuditEntityType.SECTOR,
+                    entityId = id,
+                    userId = currentUid,
+                    userName = "Administrador",
+                    userRole = "ADMIN",
+                    storeId = finalSector.storeId,
+                    sectorId = id,
+                    description = "Setor ${finalSector.name} (${finalSector.code}) salvo para a loja ${finalSector.storeId}",
+                    metadata = mapOf("sectorName" to finalSector.name, "storeId" to finalSector.storeId, "active" to "${finalSector.active}")
+                )
+            } catch (auditEx: Exception) {
+                android.util.Log.w("StoreSectorRepo", "Falha ao gravar log de auditoria do setor: ${auditEx.message}")
+            }
 
             Result.success(Unit)
+        } catch (e: TimeoutCancellationException) {
+            Result.failure(IllegalStateException("Tempo limite de 15 segundos ao gravar o setor no Firestore."))
         } catch (e: Exception) {
             Result.failure(e)
         }

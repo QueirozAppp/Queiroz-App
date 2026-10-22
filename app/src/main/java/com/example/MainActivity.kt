@@ -16,6 +16,8 @@ import com.example.core.model.UserRole
 import com.example.ui.admin.AdminUsersScreen
 import com.example.ui.admin.AdminUsersViewModel
 import com.example.ui.admin.AdminUsersViewModelFactory
+import com.example.ui.admin.store.AdminStoresScreen
+import com.example.ui.admin.store.AdminStoresViewModel
 import com.example.ui.admin.audit.AuditLogScreen
 import com.example.ui.admin.audit.AuditLogViewModel
 import com.example.ui.admin.audit.AuditLogViewModelFactory
@@ -61,6 +63,7 @@ class MainActivity : ComponentActivity() {
                 val adminUsersViewModel: AdminUsersViewModel = viewModel(
                     factory = AdminUsersViewModelFactory(context)
                 )
+                val adminStoresViewModel: AdminStoresViewModel = viewModel()
                 val adminProductsViewModel: AdminProductsViewModel = viewModel(
                     factory = AdminProductsViewModelFactory()
                 )
@@ -107,6 +110,13 @@ class MainActivity : ComponentActivity() {
                     currentScreen == "admin_users" -> {
                         AdminUsersScreen(
                             viewModel = adminUsersViewModel,
+                            onBackToHome = { currentScreen = "home" }
+                        )
+                    }
+                    currentScreen == "admin_stores" -> {
+                        AdminStoresScreen(
+                            viewModel = adminStoresViewModel,
+                            onOpenSectors = { /* handled */ },
                             onBackToHome = { currentScreen = "home" }
                         )
                     }
@@ -233,6 +243,7 @@ class MainActivity : ComponentActivity() {
                             onOpenOperationalCenter = { currentScreen = "operational_center" },
                             onOpenReports = { currentScreen = "reports" },
                             onOpenAdminUsers = { currentScreen = "admin_users" },
+                            onOpenStores = { currentScreen = "admin_stores" },
                             onOpenProducts = { currentScreen = "products" },
                             onOpenScanner = { currentScreen = "scanner" },
                             onOpenMyRequests = { currentScreen = "my_requests" },
