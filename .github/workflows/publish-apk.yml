@@ -1,0 +1,86 @@
+name: Publish APK to GitHub Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish-apk:
+    name: Build & Release Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Prepare APK Asset
+        run: |
+          mkdir -p release-assets
+          if [ -f "apk-distribution/app-debug.apk" ] && [ -s "apk-distribution/app-debug.apk" ]; then
+            echo "Using pre-built APK from apk-distribution directory."
+            cp apk-distribution/app-debug.apk release-assets/app-debug.apk
+          elif [ -f "app/build/outputs/apk/debug/app-debug.apk" ] && [ -s "app/build/outputs/apk/debug/app-debug.apk" ]; then
+            echo "Using build output APK."
+            cp app/build/outputs/apk/debug/app-debug.apk release-assets/app-debug.apk
+          else
+            echo "Compiling debug APK via Gradle..."
+            chmod +x ./gradlew 2>/dev/null || true
+            if [ -x "./gradlew" ]; then
+              ./gradlew assembleDebug --no-daemon
+            else
+              gradle assembleDebug --no-daemon
+            fi
+            cp app/build/outputs/apk/debug/app-debug.apk release-assets/app-debug.apk
+          fi
+
+      - name: Validate APK and Generate Checksum
+        run: |
+          cd release-assets
+          echo "Validating APK structure..."
+          unzip -tq app-debug.apk
+          sha256sum app-debug.apk > app-debug.apk.sha256
+          echo "APK Size: $(ls -lh app-debug.apk | awk '{print $5}')"
+          echo "SHA-256 Checksum: $(cat app-debug.apk.sha256)"
+
+      - name: Publish GitHub Release
+        run: |
+          TAG="v1.0.${{ github.run_number }}"
+          TITLE="Queiroz Avaria - Debug APK (Build ${{ github.run_number }})"
+          SHA_VAL=$(cat release-assets/app-debug.apk.sha256 | awk '{print $1}')
+          
+          NOTES=$(cat <<EOF
+          ## 📱 Queiroz Avaria — APK de Depuração
+
+          APK compilado e validado pronto para instalação em dispositivos Android.
+
+          ### 📦 Detalhes do Pacote:
+          - **Nome do Arquivo:** \`app-debug.apk\`
+          - **Tag da Versão:** \`${TAG}\`
+          - **SHA-256:** \`${SHA_VAL}\`
+
+          ### ⬇️ Link Direto Permanente para Download:
+          - **Download Direto (Última Versão):** [https://github.com/QueirozAppp/Queiroz-App/releases/latest/download/app-debug.apk](https://github.com/QueirozAppp/Queiroz-App/releases/latest/download/app-debug.apk)
+          - **Página de Todas as Versões:** [https://github.com/QueirozAppp/Queiroz-App/releases](https://github.com/QueirozAppp/Queiroz-App/releases)
+          EOF
+          )
+
+          gh release create "$TAG" \
+            --title "$TITLE" \
+            --notes "$NOTES" \
+            release-assets/app-debug.apk \
+            release-assets/app-debug.apk.sha256 \
+            --latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
