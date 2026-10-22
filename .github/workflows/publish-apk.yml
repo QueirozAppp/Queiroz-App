@@ -36,12 +36,8 @@ jobs:
             cp app/build/outputs/apk/debug/app-debug.apk release-assets/app-debug.apk
           else
             echo "Compiling debug APK via Gradle..."
-            chmod +x ./gradlew 2>/dev/null || true
-            if [ -x "./gradlew" ]; then
-              ./gradlew assembleDebug --no-daemon
-            else
-              gradle assembleDebug --no-daemon
-            fi
+            # Using --info for troubleshooting, ignoring KSP issues if possible by focusing on assembleDebug
+            gradle :app:assembleDebug --no-daemon --stacktrace
             cp app/build/outputs/apk/debug/app-debug.apk release-assets/app-debug.apk
           fi
 
