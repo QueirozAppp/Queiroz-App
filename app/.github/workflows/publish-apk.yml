@@ -1,0 +1,47 @@
+name: Publish APK to GitHub Release
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'apk-distribution/app-debug.apk'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate APK and Checksum
+        run: |
+          if [ ! -f "apk-distribution/app-debug.apk" ]; then
+            echo "APK not found!"
+            exit 1
+          fi
+          if [ -z "$(ls -A apk-distribution/app-debug.apk)" ]; then
+            echo "APK is empty!"
+            exit 1
+          fi
+          if [ ! -f "apk-distribution/app-debug.apk.sha256" ]; then
+            echo "Checksum file not found!"
+            exit 1
+          fi
+          sha256sum -c apk-distribution/app-debug.apk.sha256
+          unzip -tq apk-distribution/app-debug.apk
+
+      - name: Create Release
+        run: |
+          TAG="debug-apk-build-${{ github.run_number }}-${{ github.run_attempt }}"
+          gh release create "$TAG" \
+            --title "Debug APK Build ${{ github.run_number }}-${{ github.run_attempt }}" \
+            --notes "Automated debug APK build." \
+            apk-distribution/app-debug.apk#app-debug.apk \
+            --latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

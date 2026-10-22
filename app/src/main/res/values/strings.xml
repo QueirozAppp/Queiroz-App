@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Queiroz Avaria</string>
+    <string name="foundation_title">Queiroz Avaria</string>
+    <string name="foundation_subtitle">Base do aplicativo configurada.</string>
+    <string name="foundation_description">Fundação técnica modular preparada para a rede de supermercados.</string>
+    <string name="status_build">Compilação</string>
+    <string name="status_build_ok">Aprovado (Gradle)</string>
+    <string name="status_architecture">Arquitetura</string>
+    <string name="status_architecture_desc">Modular / Clean Architecture</string>
+    <string name="status_firebase">Firebase</string>
+    <string name="status_firebase_pending">SDK preparado (google-services.json pendente)</string>
+</resources>

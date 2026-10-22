@@ -1,0 +1,55 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isSystemActive() {
+      return isAuthenticated() &&
+        firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
+        getUserData().active == true;
+    }
+
+    function isAdmin() {
+      return isSystemActive() && getUserData().role == 'ADMIN';
+    }
+
+    function getRequestData(requestId) {
+      return firestore.get(/databases/(default)/documents/withdrawalRequests/$(requestId)).data;
+    }
+
+    // Evidence photo storage rules (Etapa 8.2 - Deterministic Path photo.jpg & Status IN_CONFERENCE)
+    match /withdrawalRequests/{requestId}/evidence/{evidenceId}/{fileName} {
+      allow read: if isSystemActive() && (
+        isAdmin() ||
+        (getUserData().role == 'SETOR_LEADER' && getRequestData(requestId).requestedBy == request.auth.uid) ||
+        (getUserData().role == 'AVARISTA' && getRequestData(requestId).storeId == getUserData().storeId)
+      );
+
+      // Create: Only AVARISTA of the request store while request status is IN_CONFERENCE by same user.
+      // Enforces deterministic filename photo.jpg, image content type, and 10MB limit.
+      allow create: if isSystemActive() &&
+        getUserData().role == 'AVARISTA' &&
+        fileName == 'photo.jpg' &&
+        firestore.exists(/databases/(default)/documents/withdrawalRequests/$(requestId)) &&
+        getRequestData(requestId).storeId == getUserData().storeId &&
+        getRequestData(requestId).status == 'IN_CONFERENCE' &&
+        getRequestData(requestId).conferenceStartedBy == request.auth.uid &&
+        request.resource.contentType.matches('image/.*') &&
+        request.resource.size < 10 * 1024 * 1024;
+
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
