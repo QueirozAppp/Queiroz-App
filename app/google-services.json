@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "196784493285",
+    "project_id": "appqueirozavaria",
+    "storage_bucket": "appqueirozavaria.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:196784493285:android:8d0481125195bbb98bba0c",
+        "android_client_info": {
+          "package_name": "com.aistudio.controledebaixas.ktfpxz"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "196784493285-btqs6j73aq9siieg9120mnucissjdl99.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCUMuqPKbD7MC1bzMOnPYRuOeJ9JwdTjCU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "196784493285-btqs6j73aq9siieg9120mnucissjdl99.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
