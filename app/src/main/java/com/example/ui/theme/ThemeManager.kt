@@ -13,7 +13,7 @@ enum class AppThemeMode {
 }
 
 /**
- * Gerenciador de tema da aplicação Queiroz Avaria.
+ * Gerenciador de tema da aplicação QRZ Stock.
  * Permite alternar entre Tema Claro, Escuro e seguir o padrão do Sistema.
  */
 object ThemeManager {

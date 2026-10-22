@@ -45,7 +45,7 @@ import com.example.ui.withdrawal.NewRequestScreen
 import com.example.ui.withdrawal.NewRequestViewModel
 
 /**
- * Atividade principal do aplicativo Queiroz Avaria.
+ * Atividade principal do aplicativo QRZ Stock.
  * Gerencia o roteamento entre Login, Home Autenticada, Administração, Produtos, Scanner, Solicitações, Conferências e Histórico (Etapa 9).
  */
 class MainActivity : ComponentActivity() {

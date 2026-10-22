@@ -1,5 +1,5 @@
 {
-  "name": "Queiroz Avaria",
+  "name": "QRZ Stock",
   "description": "Sistema Queiroz Avaria para controle de baixas e conferência de produtos.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

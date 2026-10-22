@@ -131,7 +131,7 @@ fun HomeAuthenticatedScreen(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "Queiroz Avaria",
+                                text = "QRZ Stock",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = AppColors.TextPrimary

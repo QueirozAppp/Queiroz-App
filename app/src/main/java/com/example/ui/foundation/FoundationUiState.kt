@@ -8,7 +8,7 @@ import com.example.core.model.UserRole
  * Estado da tela de fundação técnica.
  */
 data class FoundationUiState(
-    val appTitle: String = "Queiroz Avaria",
+    val appTitle: String = "QRZ Stock",
     val appSubtitle: String = "Base do aplicativo e Banco de Dados configurados.",
     val architectureStatus: String = "Arquitetura Modular / Clean Architecture com Firestore Repository",
     val buildStatus: String = "Compilado com sucesso (Gradle Kotlin DSL)",
