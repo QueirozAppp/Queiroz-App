@@ -3,6 +3,6 @@
     <item
         android:width="66dp"
         android:height="66dp"
-        android:drawable="@drawable/ic_qrz_stock_logo"
+        android:drawable="@drawable/qrz_stock_app_icon_v2_1792680824246"
         android:gravity="center" />
 </layer-list>

@@ -16,36 +16,24 @@ import com.example.BuildConfig
  */
 object FirebaseProvider {
 
-    private fun checkGoogleServicesJsonPresent(): Boolean {
-        return try {
-            val f1 = File("app/google-services.json")
-            val f2 = File("google-services.json")
-            (f1.exists() && f1.length() > 0) || (f2.exists() && f2.length() > 0)
-        } catch (e: Exception) {
-            false
-        }
-    }
-
     private fun ensureInitialized(context: Context): Boolean {
         return try {
             FirebaseApp.getInstance()
             true
         } catch (e: Exception) {
+            android.util.Log.e("FirebaseProvider", "FirebaseApp.getInstance() failed: ${e.message}")
             try {
-                if (checkGoogleServicesJsonPresent()) {
-                    if (FirebaseApp.getApps(context).isEmpty()) {
-                        FirebaseApp.initializeApp(context)
-                        if (BuildConfig.DEBUG) {
-                            com.google.firebase.appcheck.FirebaseAppCheck.getInstance().installAppCheckProviderFactory(
-                                com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory.getInstance()
-                            )
-                        }
+                if (FirebaseApp.getApps(context).isEmpty()) {
+                    FirebaseApp.initializeApp(context)
+                    if (BuildConfig.DEBUG) {
+                        com.google.firebase.appcheck.FirebaseAppCheck.getInstance().installAppCheckProviderFactory(
+                            com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory.getInstance()
+                        )
                     }
-                    true
-                } else {
-                    false
                 }
+                true
             } catch (ex: Exception) {
+                android.util.Log.e("FirebaseProvider", "FirebaseApp.initializeApp(context) failed: ${ex.message}")
                 false
             }
         }
@@ -178,15 +166,7 @@ object FirebaseProvider {
             FirebaseApp.getInstance()
             FirebaseAuth.getInstance()
         } catch (e: Exception) {
-            if (checkGoogleServicesJsonPresent()) {
-                try {
-                    FirebaseAuth.getInstance()
-                } catch (ex: Exception) {
-                    null
-                }
-            } else {
-                null
-            }
+            null
         }
     }
 
@@ -198,15 +178,7 @@ object FirebaseProvider {
             FirebaseApp.getInstance()
             FirebaseFirestore.getInstance()
         } catch (e: Exception) {
-            if (checkGoogleServicesJsonPresent()) {
-                try {
-                    FirebaseFirestore.getInstance()
-                } catch (ex: Exception) {
-                    null
-                }
-            } else {
-                null
-            }
+            null
         }
     }
 
@@ -218,15 +190,7 @@ object FirebaseProvider {
             FirebaseApp.getInstance()
             FirebaseStorage.getInstance()
         } catch (e: Exception) {
-            if (checkGoogleServicesJsonPresent()) {
-                try {
-                    FirebaseStorage.getInstance()
-                } catch (ex: Exception) {
-                    null
-                }
-            } else {
-                null
-            }
+            null
         }
     }
 }
