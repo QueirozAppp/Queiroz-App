@@ -392,18 +392,6 @@ fun LoginScreen(
                                     return@OutlinedButton
                                 }
 
-                                val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
-                                val webClientId = if (resId != 0) {
-                                    try { context.getString(resId) } catch (_: Exception) { null }
-                                } else {
-                                    null
-                                }
-
-                                if (webClientId.isNullOrBlank() || webClientId.contains("placeholder") || webClientId.contains("webclientid")) {
-                                    viewModel.setErrorMessage("Configuração do Google Sign-In pendente: ative o provedor 'Google' no Firebase Console (Projeto: appqueirozavaria) e inclua a chave SHA-1 para gerar o Client ID Web.")
-                                    return@OutlinedButton
-                                }
-
                                 val activity = context as? android.app.Activity
                                 if (activity == null) {
                                     viewModel.setErrorMessage("Contexto de tela inválido para iniciar autenticação com o Google.")
@@ -411,7 +399,7 @@ fun LoginScreen(
                                 }
 
                                 val credentialManager = androidx.credentials.CredentialManager.create(context)
-                                val signInOption = com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption.Builder(serverClientId = webClientId).build()
+                                val signInOption = com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption.Builder(serverClientId = "196784493285-a7732s5k7c88219v991j2e1k75988358.apps.googleusercontent.com").build()
                                 val request = androidx.credentials.GetCredentialRequest.Builder()
                                     .addCredentialOption(signInOption)
                                     .build()
