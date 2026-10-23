@@ -14,4 +14,47 @@ data class UserProfile(
     val active: Boolean = true,
     val createdAt: Long = 0L,
     val mustChangePassword: Boolean = false
-)
+) {
+    companion object {
+        /**
+         * Converte com segurança um documento do Firestore em um UserProfile,
+         * tolerando variações de maiúsculas/minúsculas de cargos e formatos de data (Timestamp ou Long).
+         */
+        fun fromDocument(doc: com.google.firebase.firestore.DocumentSnapshot): UserProfile {
+            val data = doc.data ?: return UserProfile(uid = doc.id)
+            val rawRole = data["role"]?.toString() ?: "AVARISTA"
+            val role = when (rawRole.trim().uppercase()) {
+                "ADMIN", "ADMINISTRADOR", "ADMINISTRATOR" -> UserRole.ADMIN
+                "SETOR_LEADER", "LIDER", "LÍDER", "LIDER_SETOR", "LEADER" -> UserRole.SETOR_LEADER
+                else -> UserRole.AVARISTA
+            }
+            val rawCreatedAt = data["createdAt"]
+            val createdAt = when (rawCreatedAt) {
+                is Number -> rawCreatedAt.toLong()
+                is com.google.firebase.Timestamp -> rawCreatedAt.toDate().time
+                else -> System.currentTimeMillis()
+            }
+            val active = when (val rawActive = data["active"]) {
+                is Boolean -> rawActive
+                is String -> rawActive.toBoolean()
+                else -> true
+            }
+            val mustChange = when (val rawMust = data["mustChangePassword"]) {
+                is Boolean -> rawMust
+                is String -> rawMust.toBoolean()
+                else -> false
+            }
+            return UserProfile(
+                uid = doc.id,
+                name = data["name"]?.toString() ?: "",
+                email = data["email"]?.toString() ?: "",
+                role = role,
+                storeId = data["storeId"]?.toString() ?: "",
+                sectorId = data["sectorId"]?.toString() ?: "",
+                active = active,
+                createdAt = createdAt,
+                mustChangePassword = mustChange
+            )
+        }
+    }
+}

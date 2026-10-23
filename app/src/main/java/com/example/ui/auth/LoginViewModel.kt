@@ -54,9 +54,19 @@ class LoginViewModel(
         }
     }
 
+    private var applicationContext: Context? = null
+
     fun loadDiagnostics(context: Context) {
+        applicationContext = context.applicationContext
         val info = FirebaseProvider.getDiagnosticInfo(context)
-        _uiState.update { it.copy(diagnosticInfo = info) }
+        val prefs = context.getSharedPreferences("qrz_stock_auth_prefs", Context.MODE_PRIVATE)
+        val savedEmail = prefs.getString("last_email", "") ?: ""
+        _uiState.update { current ->
+            current.copy(
+                diagnosticInfo = info,
+                email = if (current.email.isBlank() && savedEmail.isNotBlank()) savedEmail else current.email
+            )
+        }
     }
 
     fun toggleDiagnosticsPanel() {
@@ -153,7 +163,15 @@ class LoginViewModel(
     }
 
     fun setErrorMessage(msg: String) {
-        _uiState.update { it.copy(errorMessage = msg) }
+        _uiState.update { it.copy(errorMessage = msg, isLoading = false) }
+    }
+
+    fun setDebugErrorMessage(msg: String?) {
+        _uiState.update { it.copy(debugErrorMessage = msg) }
+    }
+
+    fun setLoading(loading: Boolean) {
+        _uiState.update { it.copy(isLoading = loading) }
     }
 
     fun onGoogleLoginResult(idToken: String, selectedStoreId: String) {
@@ -162,6 +180,12 @@ class LoginViewModel(
             val result = authRepository.loginWithGoogle(idToken, selectedStoreId)
             result.fold(
                 onSuccess = { profile ->
+                    applicationContext?.let { ctx ->
+                        try {
+                            val prefs = ctx.getSharedPreferences("qrz_stock_auth_prefs", Context.MODE_PRIVATE)
+                            prefs.edit().putString("last_email", profile.email).apply()
+                        } catch (_: Exception) {}
+                    }
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -234,6 +258,12 @@ class LoginViewModel(
             val result = authRepository.login(state.email, state.password, state.selectedStoreId)
             result.fold(
                 onSuccess = { profile ->
+                    applicationContext?.let { ctx ->
+                        try {
+                            val prefs = ctx.getSharedPreferences("qrz_stock_auth_prefs", Context.MODE_PRIVATE)
+                            prefs.edit().putString("last_email", profile.email).apply()
+                        } catch (_: Exception) {}
+                    }
                     _uiState.update {
                         it.copy(
                             isLoading = false,

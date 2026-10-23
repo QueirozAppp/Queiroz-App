@@ -73,6 +73,7 @@ import com.example.ui.components.AppColors
 import com.example.ui.components.AppErrorBanner
 import com.example.ui.components.AppPrimaryButton
 import com.example.ui.theme.ThemeManager
+import kotlinx.coroutines.launch
 
 /**
  * Tela de Login corporativa redesenhada (Etapa 20).
@@ -85,6 +86,7 @@ fun LoginScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var expandedStoreMenu by remember { mutableStateOf(false) }
     var isPasswordVisible by remember { mutableStateOf(false) }
@@ -203,6 +205,21 @@ fun LoginScreen(
                                 message = uiState.errorMessage ?: "",
                                 modifier = Modifier.testTag("login_error_banner")
                             )
+                        }
+
+                        if (!uiState.debugErrorMessage.isNullOrEmpty()) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color(0xFFFFEBEE),
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                            ) {
+                                Text(
+                                    text = "Debug: ${uiState.debugErrorMessage}",
+                                    modifier = Modifier.padding(8.dp),
+                                    color = Color(0xFFC62828),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
                         }
 
                         // Store Selector (Dropdown)
@@ -372,8 +389,54 @@ fun LoginScreen(
                             onClick = {
                                 if (uiState.selectedStoreId.isBlank()) {
                                     viewModel.setErrorMessage("Selecione a loja para acesso antes de continuar com o Google.")
+                                    return@OutlinedButton
+                                }
+
+                                val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
+                                val webClientId = if (resId != 0) {
+                                    try { context.getString(resId) } catch (_: Exception) { null }
                                 } else {
-                                    viewModel.onGoogleLoginResult(idToken = "simulated_google_token", selectedStoreId = uiState.selectedStoreId)
+                                    null
+                                }
+
+                                if (webClientId.isNullOrBlank() || webClientId.contains("placeholder") || webClientId.contains("webclientid")) {
+                                    viewModel.setErrorMessage("Configuração do Google Sign-In pendente: ative o provedor 'Google' no Firebase Console (Projeto: appqueirozavaria) e inclua a chave SHA-1 para gerar o Client ID Web.")
+                                    return@OutlinedButton
+                                }
+
+                                val activity = context as? android.app.Activity
+                                if (activity == null) {
+                                    viewModel.setErrorMessage("Contexto de tela inválido para iniciar autenticação com o Google.")
+                                    return@OutlinedButton
+                                }
+
+                                val credentialManager = androidx.credentials.CredentialManager.create(context)
+                                val signInOption = com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption.Builder(serverClientId = webClientId).build()
+                                val request = androidx.credentials.GetCredentialRequest.Builder()
+                                    .addCredentialOption(signInOption)
+                                    .build()
+
+                                coroutineScope.launch {
+                                    try {
+                                        viewModel.setLoading(true)
+                                        val result = credentialManager.getCredential(activity, request)
+                                        val credential = result.credential
+                                        if (credential is androidx.credentials.CustomCredential &&
+                                            credential.type == com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+                                        ) {
+                                            val googleIdToken = com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.createFrom(credential.data).idToken
+                                            viewModel.onGoogleLoginResult(idToken = googleIdToken, selectedStoreId = uiState.selectedStoreId)
+                                        } else {
+                                            viewModel.setErrorMessage("Tipo de credencial Google inválida.")
+                                        }
+                                    } catch (e: androidx.credentials.exceptions.GetCredentialCancellationException) {
+                                        android.util.Log.w("LoginScreen", "Login com Google cancelado pelo usuário.")
+                                        viewModel.setLoading(false)
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("LoginScreen", "Erro no Login com Google: ${e.message}", e)
+                                        viewModel.setDebugErrorMessage(e.message)
+                                        viewModel.setErrorMessage(e.localizedMessage ?: "Falha ao selecionar conta Google.")
+                                    }
                                 }
                             },
                             shape = RoundedCornerShape(12.dp),

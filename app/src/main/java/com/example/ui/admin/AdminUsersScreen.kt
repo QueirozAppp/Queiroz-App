@@ -22,6 +22,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
@@ -92,6 +93,10 @@ fun AdminUsersScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.refreshUsers()
+    }
+
     BackHandler(enabled = true) {
         onBackToHome()
     }
@@ -116,6 +121,18 @@ fun AdminUsersScreen(
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = "Voltar",
+                            tint = AppColors.TextPrimary
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = viewModel::refreshUsers,
+                        modifier = Modifier.testTag("btn_refresh_users")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Atualizar Lista",
                             tint = AppColors.TextPrimary
                         )
                     }
@@ -370,6 +387,7 @@ private fun CreateUserForm(
     var newStoreCode by remember { mutableStateOf("") }
     var newStoreName by remember { mutableStateOf("") }
     var isSavingStore by remember { mutableStateOf(false) }
+    var storeDialogError by remember { mutableStateOf<String?>(null) }
 
     val coroutineScope = rememberCoroutineScope()
     val storeRepo = remember { com.example.core.data.StoreSectorRepository() }
@@ -556,8 +574,13 @@ private fun CreateUserForm(
 
             if (showAddStoreDialog) {
                 AlertDialog(
-                    onDismissRequest = { showAddStoreDialog = false },
-                    title = { Text("Cadastrar Nova Loja", fontWeight = FontWeight.Bold) },
+                    onDismissRequest = { 
+                        if (!isSavingStore) {
+                            showAddStoreDialog = false 
+                            storeDialogError = null
+                        }
+                    },
+                    title = { Text("Cadastrar Nova Loja", fontWeight = FontWeight.Bold, color = AppColors.TextPrimary) },
                     text = {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text(
@@ -565,21 +588,42 @@ private fun CreateUserForm(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = AppColors.TextSecondary
                             )
+                            if (storeDialogError != null) {
+                                Surface(
+                                    color = AppColors.StatusDivergenceBg,
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, AppColors.StatusDivergence.copy(alpha = 0.4f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = storeDialogError!!,
+                                        color = AppColors.StatusDivergenceText,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.padding(10.dp)
+                                    )
+                                }
+                            }
                             OutlinedTextField(
                                 value = newStoreName,
-                                onValueChange = { newStoreName = it },
+                                onValueChange = { 
+                                    newStoreName = it 
+                                    storeDialogError = null
+                                },
                                 label = { Text("Nome da Loja (ex: Filial Centro)") },
                                 singleLine = true,
                                 shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().testTag("input_new_store_name")
                             )
                             OutlinedTextField(
                                 value = newStoreCode,
-                                onValueChange = { newStoreCode = it },
+                                onValueChange = { 
+                                    newStoreCode = it 
+                                    storeDialogError = null
+                                },
                                 label = { Text("Código/ID (ex: LOJA_04)") },
                                 singleLine = true,
                                 shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().testTag("input_new_store_code")
                             )
                         }
                     },
@@ -589,25 +633,40 @@ private fun CreateUserForm(
                                 val trimmedCode = newStoreCode.trim().uppercase().ifEmpty { "LOJA_${System.currentTimeMillis().toString().takeLast(4)}" }
                                 val trimmedName = newStoreName.trim().ifEmpty { "Nova Loja $trimmedCode" }
                                 isSavingStore = true
+                                storeDialogError = null
                                 coroutineScope.launch {
-                                    storeRepo.saveStore(
-                                        com.example.core.model.Store(
-                                            id = trimmedCode,
-                                            code = trimmedCode,
-                                            name = trimmedName,
-                                            active = true
+                                    try {
+                                        val saveResult = storeRepo.saveStore(
+                                            com.example.core.model.Store(
+                                                id = trimmedCode,
+                                                code = trimmedCode,
+                                                name = trimmedName,
+                                                active = true
+                                            )
                                         )
-                                    )
-                                    isSavingStore = false
-                                    showAddStoreDialog = false
-                                    viewModel.onNewStoreChanged(trimmedCode)
-                                    newStoreCode = ""
-                                    newStoreName = ""
+                                        saveResult.fold(
+                                            onSuccess = {
+                                                showAddStoreDialog = false
+                                                viewModel.onNewStoreChanged(trimmedCode)
+                                                newStoreCode = ""
+                                                newStoreName = ""
+                                                storeDialogError = null
+                                            },
+                                            onFailure = { err ->
+                                                storeDialogError = err.localizedMessage ?: "Erro ao salvar a loja."
+                                            }
+                                        )
+                                    } catch (e: Exception) {
+                                        storeDialogError = e.localizedMessage ?: "Falha ao gravar os dados da loja."
+                                    } finally {
+                                        isSavingStore = false
+                                    }
                                 }
                             },
                             enabled = !isSavingStore,
                             shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary)
+                            colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
+                            modifier = Modifier.testTag("btn_save_store_dialog")
                         ) {
                             if (isSavingStore) {
                                 CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White)
@@ -618,8 +677,13 @@ private fun CreateUserForm(
                     },
                     dismissButton = {
                         OutlinedButton(
-                            onClick = { showAddStoreDialog = false },
-                            shape = RoundedCornerShape(8.dp)
+                            onClick = { 
+                                showAddStoreDialog = false
+                                isSavingStore = false
+                                storeDialogError = null
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("btn_cancel_store_dialog")
                         ) {
                             Text("Cancelar")
                         }

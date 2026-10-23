@@ -305,58 +305,101 @@ class AuthRepository {
             IllegalStateException("Cloud Firestore não inicializado. Verifique o google-services.json.")
         )
 
-        // No Robolectric / mock environment: simulated check
+        // Robolectric / mock environment: simulated check
         if (idToken == "simulated_google_token" || idToken == "unauthorized_token") {
-            // For testing, mock check
             val mockUid = "google_user_uid"
-            // First we try to load the profile from Firestore users/{mockUid}
             val docSnap = withTimeoutOrNull(2000L) {
                 try { db.collection("users").document(mockUid).get().await() } catch (_: Exception) { null }
             }
             if (docSnap != null && docSnap.exists()) {
-                val profile = docSnap.toObject(UserProfile::class.java)?.copy(uid = mockUid)
-                if (profile != null) {
-                    if (!profile.active) {
-                        return Result.failure(SecurityException("Seu acesso está desativado. Procure um administrador."))
-                    }
-                    return Result.success(profile)
+                val profile = UserProfile.fromDocument(docSnap).copy(uid = mockUid)
+                if (!profile.active) {
+                    return Result.failure(SecurityException("Seu acesso está desativado. Procure um administrador."))
                 }
+                return Result.success(profile)
             }
             return Result.failure(SecurityException("Esta conta não possui acesso autorizado ao aplicativo."))
         }
 
         return try {
             val credential = com.google.firebase.auth.GoogleAuthProvider.getCredential(idToken, null)
-            val authResult = withTimeoutOrNull(4000L) {
+            val authResult = withTimeoutOrNull(15000L) {
                 firebaseAuth.signInWithCredential(credential).await()
             } ?: return Result.failure(IllegalStateException("Tempo limite ao autenticar com o Google."))
             val firebaseUser = authResult.user ?: return Result.failure(
                 IllegalStateException("Falha ao obter usuário do Firebase após Login com Google.")
             )
             val uid = firebaseUser.uid
+            val email = firebaseUser.email ?: ""
+            val isPrimaryAdmin = email.equals("aplicativoqueirozapp@gmail.com", ignoreCase = true)
 
-            val docSnap = withTimeoutOrNull(4000L) {
+            // 1. Busca perfil direto pelo UID do Firebase Auth
+            val docSnap = withTimeoutOrNull(10000L) {
                 try {
                     db.collection("users").document(uid).get().await()
                 } catch (_: Exception) {
                     null
                 }
-            } ?: return Result.failure(SecurityException("Não foi possível conectar ao servidor para validar seu acesso."))
-
-            if (!docSnap.exists()) {
-                firebaseAuth.signOut()
-                return Result.failure(SecurityException("Esta conta não possui acesso autorizado ao aplicativo."))
             }
 
-            val userProfile = docSnap.toObject(UserProfile::class.java)?.copy(uid = uid)
-                ?: return Result.failure(SecurityException("Erro ao processar dados do perfil."))
-
-            if (!userProfile.active) {
-                firebaseAuth.signOut()
-                return Result.failure(SecurityException("Seu acesso está desativado. Procure um administrador."))
+            if (docSnap != null && docSnap.exists()) {
+                val userProfile = UserProfile.fromDocument(docSnap)
+                if (!userProfile.active) {
+                    firebaseAuth.signOut()
+                    return Result.failure(SecurityException("Este usuário está desativado no sistema. Contate o administrador."))
+                }
+                if (userProfile.role != UserRole.ADMIN && userProfile.storeId.isNotBlank() && selectedStoreId.isNotBlank() && userProfile.storeId != selectedStoreId) {
+                    firebaseAuth.signOut()
+                    return Result.failure(SecurityException("Este usuário não possui acesso à loja selecionada (${selectedStoreId}). Loja vinculada: ${userProfile.storeId}."))
+                }
+                return Result.success(userProfile)
             }
 
-            Result.success(userProfile)
+            // 2. Se não encontrou pelo UID do Google, verifica se o administrador já havia pré-cadastrado este e-mail no Firestore
+            val queryByEmail = withTimeoutOrNull(10000L) {
+                try {
+                    db.collection("users").whereEqualTo("email", email.trim()).limit(1).get().await()
+                } catch (_: Exception) {
+                    null
+                }
+            }
+
+            if (queryByEmail != null && !queryByEmail.isEmpty) {
+                val existingDoc = queryByEmail.documents.first()
+                val existingProfile = UserProfile.fromDocument(existingDoc)
+                val linkedProfile = existingProfile.copy(uid = uid)
+                try {
+                    db.collection("users").document(uid).set(linkedProfile).await()
+                } catch (_: Exception) {}
+                if (!linkedProfile.active) {
+                    firebaseAuth.signOut()
+                    return Result.failure(SecurityException("Este usuário está desativado no sistema."))
+                }
+                return Result.success(linkedProfile)
+            }
+
+            // 3. Se for a conta do Administrador Geral raiz, cria o perfil automaticamente
+            if (isPrimaryAdmin) {
+                val primaryAdmin = UserProfile(
+                    uid = uid,
+                    name = firebaseUser.displayName?.ifBlank { "Administrador Geral" } ?: "Administrador Geral",
+                    email = email,
+                    role = UserRole.ADMIN,
+                    storeId = selectedStoreId.ifBlank { "LOJA_01" },
+                    sectorId = "Geral",
+                    active = true,
+                    createdAt = System.currentTimeMillis(),
+                    mustChangePassword = false
+                )
+                try {
+                    db.collection("users").document(uid).set(primaryAdmin).await()
+                } catch (_: Exception) {}
+                return Result.success(primaryAdmin)
+            }
+
+            // 4. Se não existir perfil cadastrado para esta conta Google
+            firebaseAuth.signOut()
+            Result.failure(SecurityException("A conta Google ($email) ainda não foi cadastrada por um Administrador no sistema QRZ Stock."))
         } catch (e: Exception) {
             val rawMsg = e.localizedMessage ?: e.message ?: ""
             val msg = when {

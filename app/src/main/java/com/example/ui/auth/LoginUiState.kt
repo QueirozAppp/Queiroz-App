@@ -31,5 +31,6 @@ data class LoginUiState(
     val resetPasswordEmail: String = "",
     val resetPasswordSuccessMessage: String? = null,
     val diagnosticInfo: FirebaseDiagnosticInfo? = null,
-    val showDiagnosticsPanel: Boolean = false
+    val showDiagnosticsPanel: Boolean = false,
+    val debugErrorMessage: String? = null
 )

@@ -101,8 +101,23 @@ class StoreSectorRepository(
                 createdAt = if (store.createdAt == 0L) now else store.createdAt,
                 updatedAt = now
             )
-            withTimeout(15000L) {
-                db.collection("stores").document(id).set(finalStore).await()
+            
+            try {
+                withTimeout(4000L) {
+                    db.collection("stores").document(id).set(finalStore).await()
+                }
+            } catch (toEx: TimeoutCancellationException) {
+                // Em redes móveis, o Firestore já gravou no cache local SQLite e continuará a sincronizar no background
+                android.util.Log.i("StoreSectorRepo", "Loja $id gravada localmente, sincronizando com a nuvem em segundo plano.")
+            }
+
+            // Semeia automaticamente os setores padrão para a nova loja criada
+            try {
+                for (sector in defaultSectorsForStore(id)) {
+                    db.collection("sectors").document(sector.id).set(sector)
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("StoreSectorRepo", "Aviso ao registrar setores padrão para $id: ${e.message}")
             }
 
             try {
@@ -125,8 +140,6 @@ class StoreSectorRepository(
             }
 
             Result.success(Unit)
-        } catch (e: TimeoutCancellationException) {
-            Result.failure(IllegalStateException("Tempo limite de 15 segundos ao gravar a loja no Firestore. Verifique sua conexão com a internet."))
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -144,8 +157,12 @@ class StoreSectorRepository(
                 createdAt = if (sector.createdAt == 0L) now else sector.createdAt,
                 updatedAt = now
             )
-            withTimeout(15000L) {
-                db.collection("sectors").document(id).set(finalSector).await()
+            try {
+                withTimeout(4000L) {
+                    db.collection("sectors").document(id).set(finalSector).await()
+                }
+            } catch (toEx: TimeoutCancellationException) {
+                android.util.Log.i("StoreSectorRepo", "Setor $id gravado localmente, sincronizando com a nuvem em segundo plano.")
             }
 
             try {
@@ -169,8 +186,6 @@ class StoreSectorRepository(
             }
 
             Result.success(Unit)
-        } catch (e: TimeoutCancellationException) {
-            Result.failure(IllegalStateException("Tempo limite de 15 segundos ao gravar o setor no Firestore."))
         } catch (e: Exception) {
             Result.failure(e)
         }

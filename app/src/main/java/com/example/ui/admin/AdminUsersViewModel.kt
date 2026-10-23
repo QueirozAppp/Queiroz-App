@@ -24,14 +24,37 @@ class AdminUsersViewModel(
 
     init {
         observeUsers()
+        refreshUsers()
         loadStores()
     }
 
     private fun observeUsers() {
         viewModelScope.launch {
-            adminRepository.usersFlow.collect { list ->
-                _uiState.update { it.copy(users = list) }
+            try {
+                adminRepository.usersFlow.collect { list ->
+                    if (list.isNotEmpty() || _uiState.value.users.isEmpty()) {
+                        _uiState.update { it.copy(users = list) }
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("AdminUsersViewModel", "Aviso no fluxo de usuários: ${e.message}")
             }
+        }
+    }
+
+    fun refreshUsers() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val result = adminRepository.fetchUsers()
+            result.fold(
+                onSuccess = { list ->
+                    _uiState.update { it.copy(users = list, isLoading = false) }
+                },
+                onFailure = { err ->
+                    android.util.Log.e("AdminUsersViewModel", "Erro ao carregar usuários: ${err.message}")
+                    _uiState.update { it.copy(isLoading = false) }
+                }
+            )
         }
     }
 
@@ -148,6 +171,7 @@ class AdminUsersViewModel(
                             successMessage = "Usuário cadastrado com sucesso!"
                         )
                     }
+                    refreshUsers()
                 },
                 onFailure = { err ->
                     _uiState.update {

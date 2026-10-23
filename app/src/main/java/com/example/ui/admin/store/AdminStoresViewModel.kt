@@ -78,41 +78,50 @@ class AdminStoresViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            val editing = state.editingStore
-            val store = if (editing != null) {
-                editing.copy(name = name, code = code, updatedAt = System.currentTimeMillis())
-            } else {
-                Store(
-                    id = code.uppercase(),
-                    name = name,
-                    code = code.uppercase(),
-                    active = true,
-                    createdAt = System.currentTimeMillis(),
-                    updatedAt = System.currentTimeMillis()
-                )
-            }
-
-            val result = repository.saveStore(store)
-            result.fold(
-                onSuccess = {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            showCreateDialog = false,
-                            editingStore = null,
-                            successMessage = "Loja salva com sucesso!"
-                        )
-                    }
-                },
-                onFailure = { err ->
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            errorMessage = err.localizedMessage ?: "Erro ao salvar loja."
-                        )
-                    }
+            try {
+                val editing = state.editingStore
+                val store = if (editing != null) {
+                    editing.copy(name = name, code = code, updatedAt = System.currentTimeMillis())
+                } else {
+                    Store(
+                        id = code.uppercase(),
+                        name = name,
+                        code = code.uppercase(),
+                        active = true,
+                        createdAt = System.currentTimeMillis(),
+                        updatedAt = System.currentTimeMillis()
+                    )
                 }
-            )
+
+                val result = repository.saveStore(store)
+                result.fold(
+                    onSuccess = {
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                showCreateDialog = false,
+                                editingStore = null,
+                                successMessage = "Loja salva com sucesso!"
+                            )
+                        }
+                    },
+                    onFailure = { err ->
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                errorMessage = err.localizedMessage ?: "Erro ao salvar loja."
+                            )
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = e.localizedMessage ?: "Erro inesperado ao salvar loja."
+                    )
+                }
+            }
         }
     }
 

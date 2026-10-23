@@ -23,31 +23,78 @@ class AdminUserRepository(
 ) {
 
     private val firestore get() = FirebaseProvider.getFirestoreOrNull()
+    private val auth get() = FirebaseProvider.getAuthOrNull()
 
     /**
      * Retorna um fluxo em tempo real com todos os usuários cadastrados na coleção `users`.
+     * Cada nova subscrição estabelece um listener ativo com tratamento resiliente de permissão e parsing.
      */
-    val usersFlow: Flow<List<UserProfile>> = callbackFlow {
-        val db = firestore
-        if (db == null) {
-            trySend(emptyList())
-            close()
-            return@callbackFlow
-        }
-
-        val listener = db.collection("users")
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    trySend(emptyList())
-                    return@addSnapshotListener
-                }
-                val list = snapshot?.documents?.mapNotNull { doc ->
-                    doc.toObject(UserProfile::class.java)?.copy(uid = doc.id)
-                } ?: emptyList()
-                trySend(list)
+    val usersFlow: Flow<List<UserProfile>>
+        get() = callbackFlow {
+            val db = firestore
+            if (db == null) {
+                trySend(emptyList())
+                close()
+                return@callbackFlow
             }
 
-        awaitClose { listener.remove() }
+            val listener = db.collection("users")
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        android.util.Log.w("AdminUserRepository", "Erro no listener de users: ${error.message}")
+                        return@addSnapshotListener
+                    }
+                    val list = snapshot?.documents?.map { doc ->
+                        UserProfile.fromDocument(doc)
+                    } ?: emptyList()
+                    trySend(list)
+                }
+
+            awaitClose { listener.remove() }
+        }
+
+    /**
+     * Busca diretamente todos os usuários cadastrados no Cloud Firestore (`users`).
+     */
+    suspend fun fetchUsers(): Result<List<UserProfile>> {
+        val db = firestore ?: return Result.failure(IllegalStateException("Firestore não inicializado."))
+        return try {
+            val querySnapshot = kotlinx.coroutines.withTimeoutOrNull(10000L) {
+                db.collection("users").get().await()
+            } ?: return Result.failure(IllegalStateException("Tempo limite ao consultar usuários no Firestore."))
+
+            val users = querySnapshot.documents.map { doc ->
+                UserProfile.fromDocument(doc)
+            }.toMutableList()
+
+            // Se o admin geral estiver autenticado e ainda não estiver na lista do Firestore, inclui e persiste
+            val currentEmail = auth?.currentUser?.email ?: ""
+            val currentUid = auth?.currentUser?.uid ?: ""
+            if (currentEmail.equals("aplicativoqueirozapp@gmail.com", ignoreCase = true) && currentUid.isNotBlank()) {
+                if (users.none { it.email.equals(currentEmail, ignoreCase = true) || it.uid == currentUid }) {
+                    val rootAdmin = UserProfile(
+                        uid = currentUid,
+                        name = "Administrador Geral",
+                        email = currentEmail,
+                        role = UserRole.ADMIN,
+                        storeId = "LOJA_01",
+                        sectorId = "Geral",
+                        active = true,
+                        createdAt = System.currentTimeMillis(),
+                        mustChangePassword = false
+                    )
+                    try {
+                        db.collection("users").document(currentUid).set(rootAdmin).await()
+                    } catch (_: Exception) {}
+                    users.add(0, rootAdmin)
+                }
+            }
+
+            Result.success(users)
+        } catch (e: Exception) {
+            android.util.Log.e("AdminUserRepository", "Erro ao carregar usuários: ${e.message}", e)
+            Result.failure(e)
+        }
     }
 
     /**
