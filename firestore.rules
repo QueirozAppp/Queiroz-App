@@ -17,9 +17,9 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && (
-        request.auth.token.email == 'aplicativoqueirozapp@gmail.com' ||
+        (request.auth.token.email != null && request.auth.token.email.matches('(?i)aplicativoqueirozapp@gmail\\.com')) ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         getUserData().role == 'ADMIN' &&
+         (getUserData().role == 'ADMIN' || getUserData().role == 'ADMINISTRADOR') &&
          getUserData().active == true)
       );
     }
@@ -129,7 +129,7 @@ service cloud.firestore {
       // Creation rule: Admins can create operational users; Bootstrap primary admin is allowed for aplicativoqueirozapp@gmail.com
       allow create: if (
         isAdmin() || 
-        (isAuthenticated() && request.auth.uid == userId && request.auth.token.email == 'aplicativoqueirozapp@gmail.com' && request.resource.data.role == 'ADMIN' && request.resource.data.active == true)
+        (isAuthenticated() && request.auth.uid == userId && (request.auth.token.email != null && request.auth.token.email.matches('(?i)aplicativoqueirozapp@gmail\\.com')) && (request.resource.data.role == 'ADMIN' || request.resource.data.role == 'ADMINISTRADOR') && request.resource.data.active == true)
       ) && 
         request.resource.data.keys().hasAll(['uid', 'name', 'email', 'role', 'storeId', 'active', 'createdAt', 'mustChangePassword']) &&
         request.resource.data.uid == userId &&
