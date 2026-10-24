@@ -151,6 +151,7 @@ class AdminUsersViewModel(
         }
 
         viewModelScope.launch {
+            android.util.Log.i("AdminUsersViewModel", "FIM_CADASTRO_INICIO")
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             val finalStoreId = if (state.newRole == UserRole.ADMIN) "LOJA_01" else state.newStoreId
             val finalSectorId = if (state.newRole == UserRole.ADMIN) "Geral" else state.newSectorId
@@ -164,6 +165,7 @@ class AdminUsersViewModel(
             )
             result.fold(
                 onSuccess = {
+                    android.util.Log.i("AdminUsersViewModel", "FIM_CADASTRO_SUCESSO")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -174,6 +176,7 @@ class AdminUsersViewModel(
                     refreshUsers()
                 },
                 onFailure = { err ->
+                    android.util.Log.e("AdminUsersViewModel", "FIM_CADASTRO_ERRO: ${err.message}")
                     _uiState.update {
                         it.copy(
                             isLoading = false,

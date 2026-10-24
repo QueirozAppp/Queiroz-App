@@ -62,6 +62,7 @@ class AdminUserRepository(
             val querySnapshot = kotlinx.coroutines.withTimeoutOrNull(10000L) {
                 db.collection("users").get().await()
             } ?: return Result.failure(IllegalStateException("Tempo limite ao consultar usuários no Firestore."))
+            android.util.Log.i("AdminUserRepository", "LISTA_ATUALIZADA: ${querySnapshot.size()}")
 
             val users = querySnapshot.documents.map { doc ->
                 UserProfile.fromDocument(doc)
@@ -109,6 +110,7 @@ class AdminUserRepository(
         storeId: String,
         sectorId: String
     ): Result<String> {
+        android.util.Log.i("AdminUserRepository", "INICIO_CADASTRO: $email")
         val db = firestore ?: return Result.failure(
             IllegalStateException("Cloud Firestore não inicializado.")
         )
@@ -188,6 +190,7 @@ class AdminUserRepository(
                 val authResult = kotlinx.coroutines.withTimeout(15000L) {
                     secondaryAuth.createUserWithEmailAndPassword(trimmedEmail, trimmedPass).await()
                 }
+                android.util.Log.i("AdminUserRepository", "AUTH_CONCLUIDO: $trimmedEmail")
                 authResult.user?.uid ?: throw IllegalStateException("UID não retornado pelo Firebase Authentication.")
             } catch (collision: com.google.firebase.auth.FirebaseAuthUserCollisionException) {
                 // Cadastro parcialmente concluído: a conta existe no Auth, mas o perfil não foi gravado no Firestore
@@ -235,6 +238,7 @@ class AdminUserRepository(
                         .set(profileData, com.google.firebase.firestore.SetOptions.merge())
                         .await()
                 }
+                android.util.Log.i("AdminUserRepository", "PERFIL_GRAVADO: $newUid")
             } catch (timeoutEx: kotlinx.coroutines.TimeoutCancellationException) {
                 throw IllegalStateException("Tempo limite de 15 segundos ao gravar o perfil no Firestore. A conta foi criada no Auth, tente salvar novamente.")
             } catch (fsEx: com.google.firebase.firestore.FirebaseFirestoreException) {
