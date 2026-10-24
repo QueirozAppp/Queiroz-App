@@ -95,8 +95,13 @@ fun LoginScreen(
         viewModel.loadDiagnostics(context)
     }
 
-    val selectedStoreName = uiState.availableStores.find { it.id == uiState.selectedStoreId }?.name
-        ?: if (uiState.availableStores.isEmpty()) "Nenhuma loja encontrada no Firestore" else "Selecione a Loja..."
+    val isEmailAdmin = uiState.email.equals("aplicativoqueirozapp@gmail.com", ignoreCase = true)
+    val selectedStoreName = if (isEmailAdmin && uiState.selectedStoreId.isBlank()) {
+        "Acesso Administrativo (Sem Loja)"
+    } else {
+        uiState.availableStores.find { it.id == uiState.selectedStoreId }?.name
+            ?: if (uiState.availableStores.isEmpty()) "Nenhuma loja encontrada no Firestore" else "Selecione a Loja..."
+    }
 
     Scaffold(
         modifier = modifier
@@ -400,10 +405,7 @@ fun LoginScreen(
 
                         OutlinedButton(
                             onClick = {
-                                if (uiState.selectedStoreId.isBlank() && !uiState.email.equals("aplicativoqueirozapp@gmail.com", ignoreCase = true)) {
-                                    viewModel.setErrorMessage("Selecione a loja para acesso antes de continuar com o Google.")
-                                    return@OutlinedButton
-                                }
+                                /* Store selection check delegated to AuthRepository */
 
                                 val activity = context as? android.app.Activity
                                 if (activity == null) {

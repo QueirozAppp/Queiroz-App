@@ -49,10 +49,6 @@ class AuthRepository {
         if (trimmedEmail.isBlank() || password.isBlank()) {
             return Result.failure(IllegalArgumentException("Informe o e-mail e a senha."))
         }
-        val isPrimaryAdmin = trimmedEmail.equals("aplicativoqueirozapp@gmail.com", ignoreCase = true)
-        if (selectedStoreId.isBlank() && !isPrimaryAdmin) {
-            return Result.failure(IllegalArgumentException("Selecione a loja para acesso."))
-        }
 
         return try {
             val isPrimaryAdmin = trimmedEmail.equals("aplicativoqueirozapp@gmail.com", ignoreCase = true)
@@ -176,11 +172,17 @@ class AuthRepository {
                 return Result.failure(SecurityException("Este usuário está desativado no sistema. Contate o administrador."))
             }
 
-            // Usuários do tipo ADMIN têm acesso global a qualquer loja selecionada;
+            // Usuários do tipo ADMIN têm acesso global sem necessidade de selecionar loja;
             // Usuários operacionais (Avarista / Líder) devem ter vínculo com a loja selecionada
-            if (userProfile.role != UserRole.ADMIN && userProfile.storeId != selectedStoreId) {
-                firebaseAuth.signOut()
-                return Result.failure(SecurityException("Este usuário não possui acesso à loja selecionada (${selectedStoreId}). Loja vinculada: ${userProfile.storeId}."))
+            if (userProfile.role != UserRole.ADMIN) {
+                if (selectedStoreId.isBlank()) {
+                    firebaseAuth.signOut()
+                    return Result.failure(SecurityException("Selecione uma loja para acesso operacional."))
+                }
+                if (userProfile.storeId.isNotBlank() && selectedStoreId.isNotBlank() && userProfile.storeId != selectedStoreId) {
+                    firebaseAuth.signOut()
+                    return Result.failure(SecurityException("Este usuário não possui acesso à loja selecionada (${selectedStoreId}). Loja vinculada: ${userProfile.storeId}."))
+                }
             }
 
             Result.success(userProfile)

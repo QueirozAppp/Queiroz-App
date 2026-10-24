@@ -124,7 +124,7 @@ service cloud.firestore {
 
     // Users collection rules
     match /users/{userId} {
-      allow get, list: if isAuthenticated();
+      allow read: if isAuthenticated();
 
       // Creation rule: Admins can create operational users; Bootstrap primary admin is allowed for aplicativoqueirozapp@gmail.com
       allow create: if (

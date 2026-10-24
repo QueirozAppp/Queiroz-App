@@ -39,7 +39,7 @@ class LoginViewModel(
                         val finalSelected = if (currentSelected.isNotBlank() && activeStores.any { it.id == currentSelected }) {
                             currentSelected
                         } else {
-                            activeStores.firstOrNull()?.id ?: ""
+                            ""
                         }
                         current.copy(
                             availableStores = activeStores,
@@ -247,10 +247,7 @@ class LoginViewModel(
             _uiState.update { it.copy(errorMessage = "Informe o e-mail e a senha.") }
             return
         }
-        if (state.selectedStoreId.isBlank() && !state.email.equals("aplicativoqueirozapp@gmail.com", ignoreCase = true)) {
-            _uiState.update { it.copy(errorMessage = "Selecione a loja para acesso.") }
-            return
-        }
+        /* Store selection check delegated to AuthRepository */
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null, authState = AuthState.Authenticating) }
