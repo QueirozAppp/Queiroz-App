@@ -96,7 +96,7 @@ fun LoginScreen(
     }
 
     val selectedStoreName = uiState.availableStores.find { it.id == uiState.selectedStoreId }?.name
-        ?: "Selecione a Loja..."
+        ?: if (uiState.availableStores.isEmpty()) "Nenhuma loja encontrada no Firestore" else "Selecione a Loja..."
 
     Scaffold(
         modifier = modifier
@@ -257,36 +257,49 @@ fun LoginScreen(
                                     .background(AppColors.Surface)
                                     .padding(vertical = 4.dp)
                             ) {
-                                uiState.availableStores.forEach { store ->
-                                    val isSelected = store.id == uiState.selectedStoreId
+                                if (uiState.availableStores.isEmpty()) {
                                     DropdownMenuItem(
                                         text = {
                                             Text(
-                                                text = store.name,
-                                                color = if (isSelected) AppColors.Primary else AppColors.TextPrimary,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                text = "Nenhuma loja ativa no Cloud Firestore. Faça login como Administrador para cadastrar lojas.",
+                                                color = AppColors.TextSecondary,
+                                                style = MaterialTheme.typography.bodySmall
                                             )
                                         },
-                                        leadingIcon = {
-                                            Icon(
-                                                imageVector = Icons.Default.Store,
-                                                contentDescription = null,
-                                                tint = if (isSelected) AppColors.Primary else AppColors.TextTertiary,
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                        },
-                                        colors = MenuDefaults.itemColors(
-                                            textColor = AppColors.TextPrimary,
-                                            leadingIconColor = AppColors.Primary
-                                        ),
-                                        modifier = Modifier.background(
-                                            if (isSelected) AppColors.PrimaryContainer else Color.Transparent
-                                        ),
-                                        onClick = {
-                                            viewModel.onStoreSelected(store.id)
-                                            expandedStoreMenu = false
-                                        }
+                                        onClick = { expandedStoreMenu = false }
                                     )
+                                } else {
+                                    uiState.availableStores.forEach { store ->
+                                        val isSelected = store.id == uiState.selectedStoreId
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    text = store.name,
+                                                    color = if (isSelected) AppColors.Primary else AppColors.TextPrimary,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            },
+                                            leadingIcon = {
+                                                Icon(
+                                                    imageVector = Icons.Default.Store,
+                                                    contentDescription = null,
+                                                    tint = if (isSelected) AppColors.Primary else AppColors.TextTertiary,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            },
+                                            colors = MenuDefaults.itemColors(
+                                                textColor = AppColors.TextPrimary,
+                                                leadingIconColor = AppColors.Primary
+                                            ),
+                                            modifier = Modifier.background(
+                                                if (isSelected) AppColors.PrimaryContainer else Color.Transparent
+                                            ),
+                                            onClick = {
+                                                viewModel.onStoreSelected(store.id)
+                                                expandedStoreMenu = false
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }

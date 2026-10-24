@@ -63,9 +63,12 @@ class AuditRepository {
                 "metadata" to sanitizedMetadata
             )
 
-            db.collection("auditLogs").document(auditId).set(auditMap).await()
+            kotlinx.coroutines.withTimeout(4000L) {
+                db.collection("auditLogs").document(auditId).set(auditMap).await()
+            }
             Result.success(auditId)
         } catch (e: Exception) {
+            android.util.Log.w("AuditRepository", "Aviso ao registrar log de auditoria: ${e.message}")
             Result.failure(e)
         }
     }

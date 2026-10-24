@@ -240,7 +240,7 @@ class AdminUserRepository(
                 }
                 android.util.Log.i("AdminUserRepository", "PERFIL_GRAVADO: $newUid")
             } catch (timeoutEx: kotlinx.coroutines.TimeoutCancellationException) {
-                throw IllegalStateException("Tempo limite de 15 segundos ao gravar o perfil no Firestore. A conta foi criada no Auth, tente salvar novamente.")
+                throw IllegalStateException("Tempo limite de 15s no Cloud Firestore. A conta Auth foi criada, mas o banco de dados não respondeu. Certifique-se de que o 'Firestore Database' foi criado no Firebase Console (Projeto: appqueirozavaria) e que as regras de segurança estão ativas.")
             } catch (fsEx: com.google.firebase.firestore.FirebaseFirestoreException) {
                 val reason = when (fsEx.code) {
                     com.google.firebase.firestore.FirebaseFirestoreException.Code.PERMISSION_DENIED ->

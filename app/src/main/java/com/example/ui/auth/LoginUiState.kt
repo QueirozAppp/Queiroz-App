@@ -19,11 +19,7 @@ data class LoginUiState(
     val email: String = "",
     val password: String = "",
     val selectedStoreId: String = "",
-    val availableStores: List<Store> = listOf(
-        Store(id = "LOJA_01", name = "Supermercado Queiroz - Matriz", code = "01"),
-        Store(id = "LOJA_02", name = "Supermercado Queiroz - Filial Centro", code = "02"),
-        Store(id = "LOJA_03", name = "Supermercado Queiroz - Filial Norte", code = "03")
-    ),
+    val availableStores: List<Store> = emptyList(),
     val authState: AuthState = AuthState.Unauthenticated,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,

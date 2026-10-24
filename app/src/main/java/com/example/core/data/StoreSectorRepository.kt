@@ -27,7 +27,7 @@ class StoreSectorRepository(
     fun getStoresFlow(): Flow<List<Store>> = callbackFlow {
         val db = firestore
         if (db == null) {
-            trySend(defaultStores())
+            trySend(emptyList())
             close()
             return@callbackFlow
         }
@@ -88,16 +88,11 @@ class StoreSectorRepository(
                 updatedAt = now
             )
             
-            try {
-                withTimeout(4000L) {
-                    db.collection("stores").document(id).set(finalStore).await()
-                }
-            } catch (toEx: TimeoutCancellationException) {
-                // Em redes móveis, o Firestore já gravou no cache local SQLite e continuará a sincronizar no background
-                android.util.Log.i("StoreSectorRepo", "Loja $id gravada localmente, sincronizando com a nuvem em segundo plano.")
+            withTimeout(10000L) {
+                db.collection("stores").document(id).set(finalStore).await()
             }
 
-            // Semeia automaticamente os setores padrão para a nova loja criada
+            // Semeia os setores iniciais para a nova loja criada (sem bloquear)
             try {
                 for (sector in defaultSectorsForStore(id)) {
                     db.collection("sectors").document(sector.id).set(sector)
@@ -106,6 +101,7 @@ class StoreSectorRepository(
                 android.util.Log.w("StoreSectorRepo", "Aviso ao registrar setores padrão para $id: ${e.message}")
             }
 
+            // Registro de auditoria assíncrono (não bloqueia a resposta)
             try {
                 val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: "admin_system"
                 val isNew = store.id.isBlank() || store.createdAt == 0L
@@ -121,11 +117,11 @@ class StoreSectorRepository(
                     description = "Loja ${finalStore.name} (${finalStore.code}) salva",
                     metadata = mapOf("storeName" to finalStore.name, "active" to "${finalStore.active}")
                 )
-            } catch (auditEx: Exception) {
-                android.util.Log.w("StoreSectorRepo", "Falha ao gravar log de auditoria da loja: ${auditEx.message}")
-            }
+            } catch (_: Exception) {}
 
             Result.success(Unit)
+        } catch (toEx: TimeoutCancellationException) {
+            Result.failure(IllegalStateException("Tempo limite de 10s ao salvar loja no Cloud Firestore. Verifique se o Firestore Database foi criado no Firebase Console (Projeto: appqueirozavaria)."))
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -143,12 +139,8 @@ class StoreSectorRepository(
                 createdAt = if (sector.createdAt == 0L) now else sector.createdAt,
                 updatedAt = now
             )
-            try {
-                withTimeout(4000L) {
-                    db.collection("sectors").document(id).set(finalSector).await()
-                }
-            } catch (toEx: TimeoutCancellationException) {
-                android.util.Log.i("StoreSectorRepo", "Setor $id gravado localmente, sincronizando com a nuvem em segundo plano.")
+            withTimeout(10000L) {
+                db.collection("sectors").document(id).set(finalSector).await()
             }
 
             try {
@@ -167,51 +159,23 @@ class StoreSectorRepository(
                     description = "Setor ${finalSector.name} (${finalSector.code}) salvo para a loja ${finalSector.storeId}",
                     metadata = mapOf("sectorName" to finalSector.name, "storeId" to finalSector.storeId, "active" to "${finalSector.active}")
                 )
-            } catch (auditEx: Exception) {
-                android.util.Log.w("StoreSectorRepo", "Falha ao gravar log de auditoria do setor: ${auditEx.message}")
-            }
+            } catch (_: Exception) {}
 
             Result.success(Unit)
+        } catch (toEx: TimeoutCancellationException) {
+            Result.failure(IllegalStateException("Tempo limite de 10s ao salvar setor no Cloud Firestore."))
         } catch (e: Exception) {
             Result.failure(e)
         }
-    }
-
-    private fun defaultStores(): List<Store> {
-        val now = System.currentTimeMillis()
-        return listOf(
-            Store(id = "LOJA_01", name = "Supermercado Queiroz - Matriz", code = "LOJA_01", active = true, createdAt = now, updatedAt = now),
-            Store(id = "LOJA_02", name = "Supermercado Queiroz - Filial Centro", code = "LOJA_02", active = true, createdAt = now, updatedAt = now),
-            Store(id = "LOJA_03", name = "Supermercado Queiroz - Filial Norte", code = "LOJA_03", active = true, createdAt = now, updatedAt = now)
-        )
     }
 
     private fun defaultSectorsForStore(storeId: String): List<Sector> {
         val now = System.currentTimeMillis()
         return listOf(
             Sector(id = "${storeId}_GERAL", storeId = storeId, name = "Geral", code = "GERAL", active = true, createdAt = now, updatedAt = now),
-            Sector(id = "${storeId}_PADARIA", storeId = storeId, name = "Padaria", code = "PADARIA", active = true, createdAt = now, updatedAt = now),
             Sector(id = "${storeId}_ACOUGUE", storeId = storeId, name = "Açougue", code = "ACOUGUE", active = true, createdAt = now, updatedAt = now),
+            Sector(id = "${storeId}_PADARIA", storeId = storeId, name = "Padaria", code = "PADARIA", active = true, createdAt = now, updatedAt = now),
             Sector(id = "${storeId}_HORTIFRUTI", storeId = storeId, name = "Hortifrúti", code = "HORTIFRUTI", active = true, createdAt = now, updatedAt = now)
         )
-    }
-
-    private suspend fun seedDefaultStores() {
-        val db = firestore ?: return
-        try {
-            for (store in defaultStores()) {
-                db.collection("stores").document(store.id).set(store).await()
-                seedDefaultSectorsForStore(store.id)
-            }
-        } catch (_: Exception) {}
-    }
-
-    private suspend fun seedDefaultSectorsForStore(storeId: String) {
-        val db = firestore ?: return
-        try {
-            for (sector in defaultSectorsForStore(storeId)) {
-                db.collection("sectors").document(sector.id).set(sector).await()
-            }
-        } catch (_: Exception) {}
     }
 }

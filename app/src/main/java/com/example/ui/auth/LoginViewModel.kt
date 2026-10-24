@@ -35,15 +35,14 @@ class LoginViewModel(
                 storeSectorRepository.getStoresFlow().collect { stores ->
                     val activeStores = stores.filter { it.active }
                     _uiState.update { current ->
-                        val updatedStores = if (activeStores.isNotEmpty()) activeStores else current.availableStores
                         val currentSelected = current.selectedStoreId
-                        val finalSelected = if (currentSelected.isNotBlank() && updatedStores.any { it.id == currentSelected }) {
+                        val finalSelected = if (currentSelected.isNotBlank() && activeStores.any { it.id == currentSelected }) {
                             currentSelected
                         } else {
-                            currentSelected.ifBlank { updatedStores.firstOrNull()?.id ?: "" }
+                            activeStores.firstOrNull()?.id ?: ""
                         }
                         current.copy(
-                            availableStores = updatedStores,
+                            availableStores = activeStores,
                             selectedStoreId = finalSelected
                         )
                     }

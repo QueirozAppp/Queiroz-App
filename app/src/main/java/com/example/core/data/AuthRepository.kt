@@ -150,7 +150,13 @@ class AuthRepository {
             } catch (fsEx: Exception) {
                 android.util.Log.e("AuthRepository", "Erro no Firestore ao buscar users/$uid: ${fsEx.message}", fsEx)
                 firebaseAuth.signOut()
-                return Result.failure(SecurityException("Falha ao recuperar perfil do usuário no servidor: ${fsEx.localizedMessage}"))
+                val raw = fsEx.localizedMessage ?: fsEx.message ?: ""
+                val friendlyMsg = if (raw.contains("offline", ignoreCase = true) || raw.contains("UNAVAILABLE", ignoreCase = true)) {
+                    "Não foi possível conectar ao Cloud Firestore. Verifique se o 'Firestore Database' foi criado no Firebase Console (Projeto: appqueirozavaria) e se o aparelho está online."
+                } else {
+                    "Falha ao recuperar perfil no servidor: $raw"
+                }
+                return Result.failure(SecurityException(friendlyMsg))
             }
 
             if (!docSnap.exists()) {
@@ -194,6 +200,8 @@ class AuthRepository {
                     "Não foi possível entrar. Verifique seu e-mail e senha."
                 rawMsg.contains("USER_DISABLED", ignoreCase = true) ->
                     "Esta conta está desativada no Firebase Authentication."
+                rawMsg.contains("offline", ignoreCase = true) || rawMsg.contains("client is offline", ignoreCase = true) ->
+                    "Não foi possível conectar ao Cloud Firestore. Verifique se o 'Firestore Database' foi criado no Firebase Console (Projeto: appqueirozavaria) e se o aparelho está online."
                 rawMsg.contains("network", ignoreCase = true) ->
                     "Erro de conexão com o servidor Firebase. Verifique sua internet."
                 else -> "Não foi possível entrar. [ ${rawMsg} ]"
