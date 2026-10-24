@@ -185,14 +185,18 @@ class AdminUserRepository(
 
             var isRecoveredFromPartial = false
             val newUid: String = try {
-                val authResult = secondaryAuth.createUserWithEmailAndPassword(trimmedEmail, trimmedPass).await()
+                val authResult = kotlinx.coroutines.withTimeout(15000L) {
+                    secondaryAuth.createUserWithEmailAndPassword(trimmedEmail, trimmedPass).await()
+                }
                 authResult.user?.uid ?: throw IllegalStateException("UID não retornado pelo Firebase Authentication.")
             } catch (collision: com.google.firebase.auth.FirebaseAuthUserCollisionException) {
                 // Cadastro parcialmente concluído: a conta existe no Auth, mas o perfil não foi gravado no Firestore
                 isRecoveredFromPartial = true
                 android.util.Log.i("AdminUserRepository", "E-mail $trimmedEmail já existe no Auth. Recuperando UID para concluir gravação do perfil...")
                 try {
-                    val signInResult = secondaryAuth.signInWithEmailAndPassword(trimmedEmail, trimmedPass).await()
+                    val signInResult = kotlinx.coroutines.withTimeout(15000L) {
+                        secondaryAuth.signInWithEmailAndPassword(trimmedEmail, trimmedPass).await()
+                    }
                     signInResult.user?.uid ?: throw IllegalStateException("UID não encontrado para a conta existente no Firebase.")
                 } catch (signInErr: Exception) {
                     throw IllegalStateException(
@@ -225,9 +229,14 @@ class AdminUserRepository(
             )
 
             try {
-                db.collection("users").document(newUid)
-                    .set(profileData, com.google.firebase.firestore.SetOptions.merge())
-                    .await()
+                // Adicionando timeout na gravação do Firestore para evitar travamento
+                kotlinx.coroutines.withTimeout(15000L) {
+                    db.collection("users").document(newUid)
+                        .set(profileData, com.google.firebase.firestore.SetOptions.merge())
+                        .await()
+                }
+            } catch (timeoutEx: kotlinx.coroutines.TimeoutCancellationException) {
+                throw IllegalStateException("Tempo limite de 15 segundos ao gravar o perfil no Firestore. A conta foi criada no Auth, tente salvar novamente.")
             } catch (fsEx: com.google.firebase.firestore.FirebaseFirestoreException) {
                 val reason = when (fsEx.code) {
                     com.google.firebase.firestore.FirebaseFirestoreException.Code.PERMISSION_DENIED ->
