@@ -49,7 +49,8 @@ class AuthRepository {
         if (trimmedEmail.isBlank() || password.isBlank()) {
             return Result.failure(IllegalArgumentException("Informe o e-mail e a senha."))
         }
-        if (selectedStoreId.isBlank()) {
+        val isPrimaryAdmin = trimmedEmail.equals("aplicativoqueirozapp@gmail.com", ignoreCase = true)
+        if (selectedStoreId.isBlank() && !isPrimaryAdmin) {
             return Result.failure(IllegalArgumentException("Selecione a loja para acesso."))
         }
 

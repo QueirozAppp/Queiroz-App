@@ -400,7 +400,7 @@ fun LoginScreen(
 
                         OutlinedButton(
                             onClick = {
-                                if (uiState.selectedStoreId.isBlank()) {
+                                if (uiState.selectedStoreId.isBlank() && !uiState.email.equals("aplicativoqueirozapp@gmail.com", ignoreCase = true)) {
                                     viewModel.setErrorMessage("Selecione a loja para acesso antes de continuar com o Google.")
                                     return@OutlinedButton
                                 }
