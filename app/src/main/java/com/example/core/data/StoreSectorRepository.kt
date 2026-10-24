@@ -35,21 +35,14 @@ class StoreSectorRepository(
         val listener = db.collection("stores")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    trySend(defaultStores())
+                    trySend(emptyList())
                     return@addSnapshotListener
                 }
                 val list = snapshot?.documents?.mapNotNull { doc ->
                     doc.toObject(Store::class.java)?.copy(id = doc.id)
                 } ?: emptyList()
 
-                if (list.isEmpty()) {
-                    kotlinx.coroutines.GlobalScope.launch {
-                        seedDefaultStores()
-                    }
-                    trySend(defaultStores())
-                } else {
-                    trySend(list.sortedBy { it.name })
-                }
+                trySend(list.sortedBy { it.name })
             }
 
         awaitClose { listener.remove() }
@@ -70,21 +63,14 @@ class StoreSectorRepository(
             .whereEqualTo("storeId", storeId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    trySend(defaultSectorsForStore(storeId))
+                    trySend(emptyList())
                     return@addSnapshotListener
                 }
                 val list = snapshot?.documents?.mapNotNull { doc ->
                     doc.toObject(Sector::class.java)?.copy(id = doc.id)
                 } ?: emptyList()
 
-                if (list.isEmpty()) {
-                    kotlinx.coroutines.GlobalScope.launch {
-                        seedDefaultSectorsForStore(storeId)
-                    }
-                    trySend(defaultSectorsForStore(storeId))
-                } else {
-                    trySend(list.sortedBy { it.name })
-                }
+                trySend(list.sortedBy { it.name })
             }
 
         awaitClose { listener.remove() }
