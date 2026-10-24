@@ -84,41 +84,40 @@ class AuthRepository {
                     null
                 }
 
-                val primaryAdmin = if (existingDoc != null && existingDoc.exists()) {
-                    val existing = existingDoc.toObject(UserProfile::class.java)
-                    UserProfile(
-                        uid = realUid,
-                        name = existing?.name?.ifBlank { "Administrador Geral" } ?: "Administrador Geral",
-                        email = trimmedEmail,
-                        role = UserRole.ADMIN,
-                        storeId = selectedStoreId.ifBlank { existing?.storeId?.ifBlank { "LOJA_01" } ?: "LOJA_01" },
-                        sectorId = "Geral",
-                        active = true,
-                        createdAt = existing?.createdAt ?: System.currentTimeMillis(),
-                        mustChangePassword = false
-                    )
-                } else {
-                    UserProfile(
-                        uid = realUid,
-                        name = "Administrador Geral",
-                        email = trimmedEmail,
-                        role = UserRole.ADMIN,
-                        storeId = selectedStoreId.ifBlank { "LOJA_01" },
-                        sectorId = "Geral",
-                        active = true,
-                        createdAt = System.currentTimeMillis(),
-                        mustChangePassword = false
-                    )
-                }
+                val existing = if (existingDoc != null && existingDoc.exists()) existingDoc.toObject(UserProfile::class.java) else null
+
+                val primaryAdminData = hashMapOf<String, Any>(
+                    "uid" to realUid,
+                    "name" to (existing?.name?.ifBlank { "Administrador Geral" } ?: "Administrador Geral"),
+                    "email" to trimmedEmail,
+                    "role" to "ADMIN",
+                    "storeId" to (selectedStoreId.ifBlank { existing?.storeId?.ifBlank { "LOJA_01" } ?: "LOJA_01" }),
+                    "sectorId" to "Geral",
+                    "active" to true,
+                    "createdAt" to (existing?.createdAt ?: System.currentTimeMillis()),
+                    "mustChangePassword" to false
+                )
 
                 // Grava e AWAITA a persistência do perfil do admin no Firestore
                 try {
                     withTimeout(15000L) {
-                        db.collection("users").document(realUid).set(primaryAdmin).await()
+                        db.collection("users").document(realUid).set(primaryAdminData).await()
                     }
                 } catch (fsEx: Exception) {
                     android.util.Log.e("AuthRepository", "Aviso ao salvar users/$realUid: ${fsEx.message}", fsEx)
                 }
+
+                val primaryAdmin = UserProfile(
+                    uid = realUid,
+                    name = primaryAdminData["name"] as String,
+                    email = trimmedEmail,
+                    role = UserRole.ADMIN,
+                    storeId = primaryAdminData["storeId"] as String,
+                    sectorId = "Geral",
+                    active = true,
+                    createdAt = primaryAdminData["createdAt"] as Long,
+                    mustChangePassword = false
+                )
 
                 return Result.success(primaryAdmin)
             }

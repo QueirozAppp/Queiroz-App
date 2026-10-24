@@ -38,6 +38,10 @@ class AdminUserRepository(
                 return@callbackFlow
             }
 
+            val currentUser = auth?.currentUser
+            android.util.Log.d("AdminUserRepository", "Listener Auth State: ${currentUser?.email ?: "NULL"} (UID: ${currentUser?.uid ?: "NULL"})")
+            android.util.Log.d("AdminUserRepository", "Firestore Path: ${db.collection("users").path}")
+
             val listener = db.collection("users")
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) {
@@ -58,6 +62,9 @@ class AdminUserRepository(
      */
     suspend fun fetchUsers(): Result<List<UserProfile>> {
         val db = firestore ?: return Result.failure(IllegalStateException("Firestore não inicializado."))
+        val currentUser = auth?.currentUser
+        android.util.Log.d("AdminUserRepository", "FetchUsers Auth State: ${currentUser?.email ?: "NULL"} (UID: ${currentUser?.uid ?: "NULL"})")
+
         return try {
             val querySnapshot = kotlinx.coroutines.withTimeoutOrNull(10000L) {
                 db.collection("users").get().await()
