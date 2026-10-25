@@ -170,7 +170,7 @@ class AdminUsersViewModel(
                         it.copy(
                             isLoading = false,
                             isCreatingUser = false,
-                            successMessage = "Usuário cadastrado com sucesso!"
+                            successMessage = "Usuário ${state.newName} cadastrado! A senha definitiva será criada por ele no primeiro acesso."
                         )
                     }
                     refreshUsers()
@@ -194,6 +194,33 @@ class AdminUsersViewModel(
             result.onFailure { err ->
                 _uiState.update { it.copy(errorMessage = "Erro ao atualizar status: ${err.message}") }
             }
+        }
+    }
+
+    fun toggleAllowPasswordChange(user: com.example.core.model.UserProfile) {
+        viewModelScope.launch {
+            val newAllowed = !user.allowPasswordChange
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            val result = adminRepository.allowUserPasswordChange(user.uid, newAllowed)
+            result.fold(
+                onSuccess = {
+                    val statusMsg = if (newAllowed) {
+                        "Troca de senha liberada para ${user.name}! O usuário poderá definir uma nova senha no próximo login."
+                    } else {
+                        "Troca de senha bloqueada para ${user.name}."
+                    }
+                    _uiState.update { it.copy(isLoading = false, successMessage = statusMsg) }
+                    refreshUsers()
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = "Erro ao alterar permissão de senha: ${err.localizedMessage ?: err.message}"
+                        )
+                    }
+                }
+            )
         }
     }
 

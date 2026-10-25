@@ -13,7 +13,9 @@ data class UserProfile(
     val sectorId: String = "",
     val active: Boolean = true,
     val createdAt: Long = 0L,
-    val mustChangePassword: Boolean = false
+    val mustChangePassword: Boolean = false,
+    val allowPasswordChange: Boolean = false,
+    val passwordDefined: Boolean = false
 ) {
     companion object {
         /**
@@ -44,6 +46,16 @@ data class UserProfile(
                 is String -> rawMust.toBoolean()
                 else -> false
             }
+            val allowPasswordChange = when (val rawAllow = data["allowPasswordChange"]) {
+                is Boolean -> rawAllow
+                is String -> rawAllow.toBoolean()
+                else -> false
+            }
+            val passwordDefined = when (val rawDefined = data["passwordDefined"]) {
+                is Boolean -> rawDefined
+                is String -> rawDefined.toBoolean()
+                else -> false
+            }
             return UserProfile(
                 uid = doc.id,
                 name = data["name"]?.toString() ?: "",
@@ -53,7 +65,9 @@ data class UserProfile(
                 sectorId = data["sectorId"]?.toString() ?: "",
                 active = active,
                 createdAt = createdAt,
-                mustChangePassword = mustChange
+                mustChangePassword = mustChange,
+                allowPasswordChange = allowPasswordChange,
+                passwordDefined = passwordDefined
             )
         }
     }

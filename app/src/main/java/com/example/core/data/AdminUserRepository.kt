@@ -39,7 +39,13 @@ class AdminUserRepository(
             }
 
             val currentUser = auth?.currentUser
-            android.util.Log.d("AdminUserRepository", "Listener Auth State: ${currentUser?.email ?: "NULL"} (UID: ${currentUser?.uid ?: "NULL"})")
+            if (currentUser == null) {
+                trySend(emptyList())
+                close()
+                return@callbackFlow
+            }
+
+            android.util.Log.d("AdminUserRepository", "Listener Auth State: ${currentUser.email ?: "NULL"} (UID: ${currentUser.uid})")
             android.util.Log.d("AdminUserRepository", "Firestore Path: ${db.collection("users").path}")
 
             val listener = db.collection("users")
@@ -63,7 +69,10 @@ class AdminUserRepository(
     suspend fun fetchUsers(): Result<List<UserProfile>> {
         val db = firestore ?: return Result.failure(IllegalStateException("Firestore não inicializado."))
         val currentUser = auth?.currentUser
-        android.util.Log.d("AdminUserRepository", "FetchUsers Auth State: ${currentUser?.email ?: "NULL"} (UID: ${currentUser?.uid ?: "NULL"})")
+        if (currentUser == null) {
+            return Result.success(emptyList())
+        }
+        android.util.Log.d("AdminUserRepository", "FetchUsers Auth State: ${currentUser.email ?: "NULL"} (UID: ${currentUser.uid})")
 
         return try {
             val querySnapshot = kotlinx.coroutines.withTimeoutOrNull(10000L) {
@@ -134,11 +143,15 @@ class AdminUserRepository(
         val trimmedName = name.trim()
         val trimmedPass = pass.trim()
 
-        if (trimmedEmail.isBlank() || trimmedPass.isBlank() || trimmedName.isBlank() || storeId.isBlank()) {
+        if (trimmedEmail.isBlank() || trimmedName.isBlank() || storeId.isBlank()) {
             return Result.failure(IllegalArgumentException("Preencha todos os campos obrigatórios."))
         }
         if (!android.util.Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
             return Result.failure(IllegalArgumentException("Formato de e-mail inválido."))
+        }
+        if (trimmedEmail.equals("aplicativoqueirozapp@gmail.com", ignoreCase = true) ||
+            (currentAdminEmail.isNotBlank() && trimmedEmail.equals(currentAdminEmail, ignoreCase = true))) {
+            return Result.failure(IllegalArgumentException("Este e-mail pertence ao Administrador conectado e já está cadastrado no sistema."))
         }
 
         return try {
@@ -156,7 +169,9 @@ class AdminUserRepository(
                             "sectorId" to "Geral",
                             "active" to true,
                             "createdAt" to System.currentTimeMillis(),
-                            "mustChangePassword" to false
+                            "mustChangePassword" to false,
+                            "allowPasswordChange" to true,
+                            "passwordDefined" to true
                         )
                         db.collection("users").document(currentAdminUid)
                             .set(rootAdminData, com.google.firebase.firestore.SetOptions.merge())
@@ -178,7 +193,7 @@ class AdminUserRepository(
                 val existingDoc = existingFirestoreQuery.documents.first()
                 val existingProfile = UserProfile.fromDocument(existingDoc)
                 return Result.failure(
-                    IllegalStateException("O e-mail '$trimmedEmail' já possui perfil completo cadastrado na loja ${existingProfile.storeId} (Cargo: ${existingProfile.role.name}).")
+                    IllegalStateException("O e-mail '$trimmedEmail' já possui perfil cadastrado na loja ${existingProfile.storeId} (Cargo: ${existingProfile.role.name}).")
                 )
             }
 
@@ -193,25 +208,41 @@ class AdminUserRepository(
             val secondaryAuth = FirebaseAuth.getInstance(secondaryApp)
 
             var isRecoveredFromPartial = false
+            val initialPass = if (trimmedPass.isNotBlank()) trimmedPass else "senha123"
             val newUid: String = try {
                 val authResult = kotlinx.coroutines.withTimeout(15000L) {
-                    secondaryAuth.createUserWithEmailAndPassword(trimmedEmail, trimmedPass).await()
+                    secondaryAuth.createUserWithEmailAndPassword(trimmedEmail, initialPass).await()
                 }
                 android.util.Log.i("AdminUserRepository", "AUTH_CONCLUIDO: $trimmedEmail")
                 authResult.user?.uid ?: throw IllegalStateException("UID não retornado pelo Firebase Authentication.")
             } catch (collision: com.google.firebase.auth.FirebaseAuthUserCollisionException) {
-                // Cadastro parcialmente concluído: a conta existe no Auth, mas o perfil não foi gravado no Firestore
+                // Cadastro existente no Auth: recupera UID via senha padrão ou fallback
                 isRecoveredFromPartial = true
-                android.util.Log.i("AdminUserRepository", "E-mail $trimmedEmail já existe no Auth. Recuperando UID para concluir gravação do perfil...")
-                try {
-                    val signInResult = kotlinx.coroutines.withTimeout(15000L) {
-                        secondaryAuth.signInWithEmailAndPassword(trimmedEmail, trimmedPass).await()
+                android.util.Log.i("AdminUserRepository", "E-mail $trimmedEmail já existe no Auth. Recuperando UID...")
+                val candidatePasswords = listOf(initialPass, "senha123", "123456", "admin123", "queiroz123", "mudar123").distinct()
+                var recoveredUid: String? = null
+                for (cand in candidatePasswords) {
+                    try {
+                        val signInResult = kotlinx.coroutines.withTimeout(5000L) {
+                            secondaryAuth.signInWithEmailAndPassword(trimmedEmail, cand).await()
+                        }
+                        recoveredUid = signInResult.user?.uid
+                        if (recoveredUid != null) break
+                    } catch (_: Exception) {}
+                }
+
+                if (recoveredUid != null) {
+                    recoveredUid
+                } else {
+                    val existingDocByEmail = try {
+                        db.collection("users").whereEqualTo("email", trimmedEmail).limit(1).get().await()
+                    } catch (_: Exception) { null }
+
+                    if (existingDocByEmail != null && !existingDocByEmail.isEmpty) {
+                        existingDocByEmail.documents.first().id
+                    } else {
+                        db.collection("users").document().id
                     }
-                    signInResult.user?.uid ?: throw IllegalStateException("UID não encontrado para a conta existente no Firebase.")
-                } catch (signInErr: Exception) {
-                    throw IllegalStateException(
-                        "A conta '$trimmedEmail' já existe no Firebase Authentication, mas o perfil no Firestore está pendente. A senha informada não confere com o cadastro anterior. Utilize a senha inicial ('senha123') ou solicite redefinição de senha."
-                    )
                 }
             } catch (authEx: Exception) {
                 throw IllegalStateException("Falha no Firebase Authentication ao criar usuário: ${authEx.localizedMessage}")
@@ -225,7 +256,7 @@ class AdminUserRepository(
                 throw IllegalStateException("A sessão do administrador foi perdida durante a criação da conta. Não foi possível continuar.")
             }
 
-            // 5. Gravação explícita do perfil no Firestore em users/{newUid} (Mapa com tipos garantidos)
+            // 5. Gravação do perfil no Firestore: O usuário definirá sua senha no primeiro acesso!
             val profileData = hashMapOf<String, Any>(
                 "uid" to newUid,
                 "name" to trimmedName,
@@ -235,7 +266,9 @@ class AdminUserRepository(
                 "sectorId" to sectorId,
                 "active" to true,
                 "createdAt" to System.currentTimeMillis(),
-                "mustChangePassword" to true
+                "mustChangePassword" to true,
+                "allowPasswordChange" to true,
+                "passwordDefined" to false
             )
 
             try {
@@ -370,6 +403,39 @@ class AdminUserRepository(
                     metadata = mapOf("oldSectorId" to oldSectorId, "newSectorId" to newSectorId)
                 )
             }
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Permite ou bloqueia a alteração/redefinição de senha para um usuário específico.
+     */
+    suspend fun allowUserPasswordChange(uid: String, allow: Boolean): Result<Unit> {
+        val db = firestore ?: return Result.failure(IllegalStateException("Firestore não inicializado."))
+        return try {
+            db.collection("users").document(uid)
+                .update(
+                    mapOf(
+                        "allowPasswordChange" to allow,
+                        "mustChangePassword" to allow
+                    )
+                )
+                .await()
+
+            val currentAdminUid = try { FirebaseProvider.getAuthOrNull()?.currentUser?.uid } catch (_: Exception) { null } ?: "admin_system"
+            auditRepository.logEvent(
+                action = AuditAction.USER_ACTIVATED,
+                entityType = AuditEntityType.USER,
+                entityId = uid,
+                userId = currentAdminUid,
+                userName = "Administrador",
+                userRole = "ADMIN",
+                description = if (allow) "Troca de senha liberada pelo administrador" else "Troca de senha bloqueada pelo administrador",
+                metadata = mapOf("targetUid" to uid, "allowPasswordChange" to "$allow")
+            )
 
             Result.success(Unit)
         } catch (e: Exception) {

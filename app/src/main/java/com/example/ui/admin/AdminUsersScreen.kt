@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -251,7 +252,8 @@ fun AdminUsersScreen(
                         items(uiState.users, key = { it.uid }) { user ->
                             UserItemCard(
                                 user = user,
-                                onToggleActive = { viewModel.toggleUserActive(user.uid, user.active) }
+                                onToggleActive = { viewModel.toggleUserActive(user.uid, user.active) },
+                                onTogglePasswordPermission = { viewModel.toggleAllowPasswordChange(user) }
                             )
                         }
                     }
@@ -264,7 +266,8 @@ fun AdminUsersScreen(
 @Composable
 private fun UserItemCard(
     user: UserProfile,
-    onToggleActive: () -> Unit
+    onToggleActive: () -> Unit,
+    onTogglePasswordPermission: () -> Unit
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
@@ -368,6 +371,56 @@ private fun UserItemCard(
                         )
                     }
                 }
+
+                // Status da Senha (Definida vs Pendente vs Liberada)
+                val (pwdLabel, pwdBg, pwdText) = when {
+                    !user.passwordDefined -> Triple("1º Acesso Pendente", Color(0xFFFFF3E0), Color(0xFFE65100))
+                    user.allowPasswordChange -> Triple("Troca Liberada", Color(0xFFE3F2FD), Color(0xFF0D47A1))
+                    else -> Triple("Senha Definitiva", Color(0xFFE8F5E9), Color(0xFF2E7D32))
+                }
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = pwdBg
+                ) {
+                    Text(
+                        text = pwdLabel,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = pwdText
+                    )
+                }
+            }
+
+            // Ação administrativa: Permitir / Bloquear alteração de senha
+            if (user.role != UserRole.ADMIN) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = onTogglePasswordPermission,
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.testTag("btn_toggle_password_${user.uid}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = if (user.allowPasswordChange) AppColors.StatusDivergenceText else AppColors.Primary
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (user.allowPasswordChange) "Bloquear Troca de Senha" else "Liberar Troca de Senha",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (user.allowPasswordChange) AppColors.StatusDivergenceText else AppColors.Primary
+                        )
+                    }
+                }
             }
         }
     }
@@ -445,7 +498,7 @@ private fun CreateUserForm(
                     .testTag("input_new_email")
             )
 
-            // Auto Password Notice
+            // First Access Password Notice
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -462,13 +515,13 @@ private fun CreateUserForm(
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
                     Text(
-                        text = "Senha Inicial Automática",
+                        text = "Senha no Primeiro Acesso",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = AppColors.OnPrimaryContainer
                     )
                     Text(
-                        text = "A senha inicial será definida automaticamente para este usuário.",
+                        text = "O novo usuário definirá sua senha definitiva na primeira vez que entrar no aplicativo. Essa senha só poderá ser alterada com sua autorização.",
                         style = MaterialTheme.typography.bodySmall,
                         color = AppColors.OnPrimaryContainer.copy(alpha = 0.85f)
                     )

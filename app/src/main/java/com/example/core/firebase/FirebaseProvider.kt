@@ -175,7 +175,8 @@ object FirebaseProvider {
      */
     fun getFirestoreOrNull(): FirebaseFirestore? {
         return try {
-            FirebaseApp.getInstance()
+            val app = FirebaseApp.getInstance()
+            android.util.Log.d("FirebaseProvider", "Firestore requested for project: ${app.options.projectId}")
             FirebaseFirestore.getInstance()
         } catch (e: Exception) {
             null

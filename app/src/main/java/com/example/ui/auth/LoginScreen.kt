@@ -362,6 +362,13 @@ fun LoginScreen(
                                 .testTag("password_input")
                         )
 
+                        Text(
+                            text = "Primeiro acesso? A senha digitada aqui será gravada como sua senha definitiva.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = AppColors.TextSecondary,
+                            modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                        )
+
                         // Forgot Password Link
                         TextButton(
                             onClick = viewModel::openForgotPasswordDialog,

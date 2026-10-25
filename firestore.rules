@@ -1,8 +1,77 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        (request.auth.token.email != null && request.auth.token.email.matches('(?i)aplicativoqueirozapp@gmail\\.com')) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN' || 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMINISTRADOR') &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.active == true)
+      );
+    }
+
+    function isSystemActive() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'aplicativoqueirozapp@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.active == true)
+      );
+    }
+
+    // Regras da coleção de Usuários (Users)
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Regras da coleção de Lojas (Stores)
+    match /stores/{storeId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Regras da coleção de Setores (Sectors)
+    match /sectors/{sectorId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Regras da coleção de Produtos (Catalog)
+    match /products/{productId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Regras de Solicitações de Baixa (Withdrawal Requests)
+    match /withdrawalRequests/{requestId} {
+      allow read, write: if isAuthenticated();
+
+      match /evidence/{evidenceId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+
+    // Regras de Logs de Auditoria (AuditLogs - Imutáveis)
+    match /auditLogs/{auditId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
+    }
+
+    // Default deny para qualquer outra coleção não especificada
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }
