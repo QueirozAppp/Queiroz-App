@@ -442,4 +442,45 @@ class AdminUserRepository(
             Result.failure(e)
         }
     }
+
+    suspend fun deleteUser(uid: String): Result<Unit> {
+        val db = firestore ?: return Result.failure(IllegalStateException("Firestore não inicializado."))
+        return try {
+            val userDoc = db.collection("users").document(uid).get().await()
+            val user = userDoc.toObject(UserProfile::class.java)
+            
+            // 1. Excluir do Firebase Auth (via app secundário)
+            val secondaryAppName = "admin_secondary_auth_app"
+            val secondaryApp = try {
+                FirebaseApp.getInstance(secondaryAppName)
+            } catch (_: Exception) {
+                val primaryOptions = FirebaseApp.getInstance().options
+                FirebaseApp.initializeApp(context, primaryOptions, secondaryAppName)
+            }
+            val secondaryAuth = FirebaseAuth.getInstance(secondaryApp)
+            
+            // Nota: Excluir um usuário do Firebase Auth requer o UID, mas FirebaseAuth.getInstance()
+            // geralmente gerencia o usuário logado. Como estamos como Admin, precisamos de um Admin SDK
+            // que não temos acesso direto aqui.
+            // Alternativa: desativar o usuário permanentemente e remover do Firestore.
+            
+            db.collection("users").document(uid).delete().await()
+            
+            val currentAdminUid = try { FirebaseProvider.getAuthOrNull()?.currentUser?.uid } catch (_: Exception) { null } ?: "admin_system"
+            auditRepository.logEvent(
+                action = AuditAction.USER_DELETED,
+                entityType = AuditEntityType.USER,
+                entityId = uid,
+                userId = currentAdminUid,
+                userName = "Administrador",
+                userRole = "ADMIN",
+                description = "Usuário ${user?.name ?: "Desconhecido"} removido do banco pelo administrador",
+                metadata = mapOf("targetUid" to uid)
+            )
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

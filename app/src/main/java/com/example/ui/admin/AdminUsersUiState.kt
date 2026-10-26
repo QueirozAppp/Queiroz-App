@@ -22,5 +22,6 @@ data class AdminUsersUiState(
     val newSectorId: String = "",
     val availableStores: List<Store> = emptyList(),
     val availableSectors: List<Sector> = emptyList(),
-    val allowedRolesToCreate: List<UserRole> = listOf(UserRole.ADMIN, UserRole.AVARISTA, UserRole.SETOR_LEADER)
+    val allowedRolesToCreate: List<UserRole> = listOf(UserRole.ADMIN, UserRole.AVARISTA, UserRole.SETOR_LEADER),
+    val userToDelete: UserProfile? = null
 )

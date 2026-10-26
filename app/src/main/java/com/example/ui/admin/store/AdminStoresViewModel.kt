@@ -131,4 +131,26 @@ class AdminStoresViewModel(
             repository.saveStore(updated)
         }
     }
+
+    fun deleteStore(store: Store) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            val result = repository.deleteStore(store.id)
+            result.fold(
+                onSuccess = {
+                    _uiState.update { it.copy(isLoading = false, successMessage = "Loja ${store.name} removida com sucesso!") }
+                    loadStores()
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = "Erro ao excluir loja: ${err.localizedMessage ?: err.message}"
+                        )
+                    }
+                }
+            )
+        }
+    }
 }
+

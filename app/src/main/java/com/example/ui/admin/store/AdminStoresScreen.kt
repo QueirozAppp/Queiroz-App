@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Store
@@ -41,10 +42,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -71,6 +76,33 @@ fun AdminStoresScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    var showDeleteConfirmation by remember { mutableStateOf<Store?>(null) }
+    
+    // Deletion Dialog
+    showDeleteConfirmation?.let { storeToDelete ->
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = null },
+            title = { Text("Excluir Loja") },
+            text = { Text("Tem certeza que deseja excluir a loja ${storeToDelete.name}? Todos os setores vinculados também serão removidos.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteStore(storeToDelete)
+                        showDeleteConfirmation = null
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = AppColors.StatusDivergence)
+                ) {
+                    Text("Excluir")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -151,7 +183,8 @@ fun AdminStoresScreen(
                             store = store,
                             onEdit = { viewModel.openEditDialog(store) },
                             onToggleActive = { viewModel.toggleStoreActive(store) },
-                            onManageSectors = { onOpenSectors(store.id) }
+                            onManageSectors = { onOpenSectors(store.id) },
+                            onDelete = { showDeleteConfirmation = store }
                         )
                     }
                 }
@@ -214,7 +247,8 @@ private fun StoreItemCard(
     store: Store,
     onEdit: () -> Unit,
     onToggleActive: () -> Unit,
-    onManageSectors: () -> Unit
+    onManageSectors: () -> Unit,
+    onDelete: () -> Unit
 ) {
     Card(
         shape = RoundedCornerShape(14.dp),
@@ -287,6 +321,13 @@ private fun StoreItemCard(
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Excluir Loja",
+                            tint = AppColors.StatusDivergenceText
+                        )
+                    }
                     OutlinedButton(
                         onClick = onEdit,
                         shape = RoundedCornerShape(8.dp),

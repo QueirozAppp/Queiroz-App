@@ -36,12 +36,14 @@ object AuditAction {
     const val USER_STORE_CHANGED = "USER_STORE_CHANGED"
     const val USER_SECTOR_CHANGED = "USER_SECTOR_CHANGED"
     const val USER_ROLE_CHANGED = "USER_ROLE_CHANGED"
+    const val USER_DELETED = "USER_DELETED"
 
     // Lojas
     const val STORE_CREATED = "STORE_CREATED"
     const val STORE_UPDATED = "STORE_UPDATED"
     const val STORE_ACTIVATED = "STORE_ACTIVATED"
     const val STORE_DEACTIVATED = "STORE_DEACTIVATED"
+    const val STORE_DELETED = "STORE_DELETED"
 
     // Setores
     const val SECTOR_CREATED = "SECTOR_CREATED"

@@ -178,4 +178,35 @@ class StoreSectorRepository(
             Sector(id = "${storeId}_HORTIFRUTI", storeId = storeId, name = "Hortifrúti", code = "HORTIFRUTI", active = true, createdAt = now, updatedAt = now)
         )
     }
+    suspend fun deleteStore(storeId: String): Result<Unit> {
+        val db = firestore ?: return Result.failure(IllegalStateException("Firestore indisponível."))
+        return try {
+            val storeDoc = db.collection("stores").document(storeId).get().await()
+            val store = storeDoc.toObject(Store::class.java)
+            
+            db.collection("stores").document(storeId).delete().await()
+            
+            // Delete sectors for this store
+            val sectors = db.collection("sectors").whereEqualTo("storeId", storeId).get().await()
+            for (doc in sectors.documents) {
+                db.collection("sectors").document(doc.id).delete().await()
+            }
+            
+            val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: "admin_system"
+            auditRepository.logEvent(
+                action = AuditAction.STORE_DELETED,
+                entityType = AuditEntityType.STORE,
+                entityId = storeId,
+                userId = currentUid,
+                userName = "Administrador",
+                userRole = "ADMIN",
+                description = "Loja ${store?.name ?: "Desconhecida"} removida pelo administrador",
+                metadata = mapOf("storeId" to storeId)
+            )
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

@@ -224,6 +224,27 @@ class AdminUsersViewModel(
         }
     }
 
+    fun deleteUser(user: com.example.core.model.UserProfile) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            val result = adminRepository.deleteUser(user.uid)
+            result.fold(
+                onSuccess = {
+                    _uiState.update { it.copy(isLoading = false, successMessage = "Usuário ${user.name} removido com sucesso!") }
+                    refreshUsers()
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = "Erro ao excluir usuário: ${err.localizedMessage ?: err.message}"
+                        )
+                    }
+                }
+            )
+        }
+    }
+
     fun clearMessages() {
         _uiState.update { it.copy(errorMessage = null, successMessage = null) }
     }

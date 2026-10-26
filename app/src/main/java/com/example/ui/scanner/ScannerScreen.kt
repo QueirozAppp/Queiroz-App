@@ -265,53 +265,17 @@ fun ScannerScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(20.dp)
                     ) {
-                        // Viewfinder Frame
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
-                            shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(2.dp, AppColors.PrimaryLight.copy(alpha = 0.5f)),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        // Viewfinder
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(220.dp)
+                                .height(300.dp)
+                                .background(Color.Black, RoundedCornerShape(16.dp))
+                                .testTag("camera_viewfinder")
                         ) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.padding(16.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(64.dp)
-                                            .background(AppColors.PrimaryContainer, CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.QrCodeScanner,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(36.dp),
-                                            tint = AppColors.Primary
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "Aponte para o Código de Barras",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        textAlign = TextAlign.Center,
-                                        color = AppColors.TextPrimary
-                                    )
-                                    Text(
-                                        text = "Posicione o código no centro da mira para captura",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = AppColors.TextSecondary
-                                    )
-                                }
-                            }
+                            CameraScanner(onBarcodeScanned = { barcode ->
+                                viewModel.onBarcodeScanned(barcode)
+                            })
                         }
 
                         // Manual fallback entry
