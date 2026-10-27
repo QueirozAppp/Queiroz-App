@@ -1,10 +1,14 @@
 package com.example.ui.product.request
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.util.Base64
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -38,7 +42,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Store
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -52,6 +59,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -109,15 +117,72 @@ fun RequestProductScreen(
         onBackToHome()
     }
 
+    val context = LocalContext.current
+
+    // Photo picker (Gallery) launcher
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    val bitmap = BitmapFactory.decodeStream(stream)
+                    if (bitmap != null) {
+                        val base64 = resizeAndCompressBitmap(bitmap)
+                        viewModel.onPhotoCaptured(base64)
+                    } else {
+                        viewModel.setErrorMessage("Não foi possível processar a imagem da galeria.")
+                    }
+                }
+            } catch (e: Exception) {
+                viewModel.setErrorMessage("Erro ao carregar foto da galeria: ${e.localizedMessage ?: e.message}")
+            }
+        }
+    }
+
     // Camera launcher to take a photo of the product
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
     ) { bitmap: Bitmap? ->
         if (bitmap != null) {
-            val outputStream = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 75, outputStream)
-            val base64 = Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
-            viewModel.onPhotoCaptured(base64)
+            try {
+                val base64 = resizeAndCompressBitmap(bitmap)
+                viewModel.onPhotoCaptured(base64)
+            } catch (e: Exception) {
+                viewModel.setErrorMessage("Erro ao processar foto da câmera: ${e.localizedMessage ?: e.message}")
+            }
+        }
+    }
+
+    // Camera runtime permission launcher
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            try {
+                cameraLauncher.launch(null)
+            } catch (e: Exception) {
+                viewModel.setErrorMessage("Não foi possível acionar a câmera. Tente utilizar a opção Galeria.")
+            }
+        } else {
+            viewModel.setErrorMessage("Permissão da câmera necessária para tirar fotos. Você também pode escolher pela Galeria.")
+        }
+    }
+
+    fun openCameraSafely() {
+        try {
+            val hasPermission = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (hasPermission) {
+                cameraLauncher.launch(null)
+            } else {
+                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+        } catch (e: Exception) {
+            viewModel.setErrorMessage("Erro ao abrir a câmera: ${e.localizedMessage ?: "Câmera indisponível"}. Escolha pela Galeria.")
         }
     }
 
@@ -332,20 +397,38 @@ fun RequestProductScreen(
                                     modifier = Modifier.fillMaxSize(),
                                     contentScale = ContentScale.Crop
                                 )
-                                IconButton(
-                                    onClick = { viewModel.onPhotoCaptured("") },
+                                Row(
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
-                                        .padding(8.dp)
-                                        .background(Color.Black.copy(alpha = 0.6f), CircleShape)
-                                        .size(36.dp)
+                                        .padding(8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Remover Foto",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                                    IconButton(
+                                        onClick = { openCameraSafely() },
+                                        modifier = Modifier
+                                            .background(Color.Black.copy(alpha = 0.65f), CircleShape)
+                                            .size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.CameraAlt,
+                                            contentDescription = "Tirar outra foto",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { viewModel.onPhotoCaptured("") },
+                                        modifier = Modifier
+                                            .background(Color.Black.copy(alpha = 0.65f), CircleShape)
+                                            .size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Remover Foto",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -354,20 +437,20 @@ fun RequestProductScreen(
                             shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
                             border = BorderStroke(1.dp, AppColors.BorderSubtle),
-                            onClick = { cameraLauncher.launch(null) },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(160.dp)
-                                .testTag("btn_take_product_photo")
+                                .testTag("card_product_photo_picker")
                         ) {
                             Column(
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.Center,
-                                horizontalAlignment = Alignment.CenterHorizontally
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(20.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(56.dp)
+                                        .size(54.dp)
                                         .background(AppColors.PrimaryContainer, CircleShape),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -375,21 +458,73 @@ fun RequestProductScreen(
                                         imageVector = Icons.Default.AddAPhoto,
                                         contentDescription = null,
                                         tint = AppColors.Primary,
-                                        modifier = Modifier.size(28.dp)
+                                        modifier = Modifier.size(26.dp)
                                     )
                                 }
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Text(
-                                    text = "Tocar para Tirar Foto",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = AppColors.Primary
-                                )
-                                Text(
-                                    text = "Obrigatório para aprovação do cadastro",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = AppColors.TextTertiary
-                                )
+
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = "Adicionar Foto do Produto",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = AppColors.TextPrimary
+                                    )
+                                    Text(
+                                        text = "Tire uma foto ou escolha da galeria para aprovação",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = AppColors.TextTertiary
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Button(
+                                        onClick = { openCameraSafely() },
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(44.dp)
+                                            .testTag("btn_take_product_photo")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.CameraAlt,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Tirar Foto", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = {
+                                            try {
+                                                galleryLauncher.launch(
+                                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                                )
+                                            } catch (e: Exception) {
+                                                viewModel.setErrorMessage("Erro ao abrir galeria: ${e.message}")
+                                            }
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.dp, AppColors.Primary),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.Primary),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(44.dp)
+                                            .testTag("btn_pick_gallery_photo")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.PhotoLibrary,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Galeria", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                                    }
+                                }
                             }
                         }
                     }
@@ -720,4 +855,23 @@ private fun MyRequestItemCard(request: ProductRegistrationRequest) {
             }
         }
     }
+}
+
+private fun resizeAndCompressBitmap(bitmap: Bitmap, maxDimension: Int = 800, quality: Int = 75): String {
+    val width = bitmap.width
+    val height = bitmap.height
+    val scale = if (width > maxDimension || height > maxDimension) {
+        val maxSide = maxOf(width, height)
+        maxDimension.toFloat() / maxSide
+    } else 1.0f
+
+    val targetWidth = (width * scale).toInt().coerceAtLeast(1)
+    val targetHeight = (height * scale).toInt().coerceAtLeast(1)
+    val scaledBitmap = if (scale < 1.0f) {
+        Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)
+    } else bitmap
+
+    val outputStream = ByteArrayOutputStream()
+    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
+    return Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
 }

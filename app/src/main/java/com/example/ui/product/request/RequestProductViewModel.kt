@@ -54,6 +54,10 @@ class RequestProductViewModel(
         _uiState.update { it.copy(errorMessage = null, successMessage = null) }
     }
 
+    fun setErrorMessage(message: String) {
+        _uiState.update { it.copy(errorMessage = message) }
+    }
+
     fun submitRequest(userProfile: UserProfile) {
         val state = _uiState.value
 
