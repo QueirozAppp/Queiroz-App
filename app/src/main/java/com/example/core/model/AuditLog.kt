@@ -56,6 +56,11 @@ object AuditAction {
     const val PRODUCT_UPDATED = "PRODUCT_UPDATED"
     const val PRODUCT_ACTIVATED = "PRODUCT_ACTIVATED"
     const val PRODUCT_DEACTIVATED = "PRODUCT_DEACTIVATED"
+
+    // Solicitações de Cadastro de Produto
+    const val PRODUCT_REQUEST_CREATED = "PRODUCT_REQUEST_CREATED"
+    const val PRODUCT_REQUEST_APPROVED = "PRODUCT_REQUEST_APPROVED"
+    const val PRODUCT_REQUEST_REJECTED = "PRODUCT_REQUEST_REJECTED"
 }
 
 object AuditEntityType {
@@ -65,4 +70,5 @@ object AuditEntityType {
     const val STORE = "STORE"
     const val SECTOR = "SECTOR"
     const val PRODUCT = "PRODUCT"
+    const val PRODUCT_REQUEST = "PRODUCT_REQUEST"
 }

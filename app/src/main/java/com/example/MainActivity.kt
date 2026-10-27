@@ -18,6 +18,8 @@ import com.example.ui.admin.AdminUsersViewModel
 import com.example.ui.admin.AdminUsersViewModelFactory
 import com.example.ui.admin.store.AdminStoresScreen
 import com.example.ui.admin.store.AdminStoresViewModel
+import com.example.ui.admin.sector.AdminSectorsScreen
+import com.example.ui.admin.sector.AdminSectorsViewModel
 import com.example.ui.admin.audit.AuditLogScreen
 import com.example.ui.admin.audit.AuditLogViewModel
 import com.example.ui.admin.audit.AuditLogViewModelFactory
@@ -36,6 +38,10 @@ import com.example.ui.history.HistoryViewModel
 import com.example.ui.home.HomeAuthenticatedScreen
 import com.example.ui.operational.OperationalCenterScreen
 import com.example.ui.operational.OperationalCenterViewModel
+import com.example.ui.product.approval.ProductApprovalScreen
+import com.example.ui.product.approval.ProductApprovalViewModel
+import com.example.ui.product.request.RequestProductScreen
+import com.example.ui.product.request.RequestProductViewModel
 import com.example.ui.reports.ReportsScreen
 import com.example.ui.reports.ReportsViewModel
 import com.example.ui.scanner.ScannerScreen
@@ -64,6 +70,7 @@ class MainActivity : ComponentActivity() {
                     factory = AdminUsersViewModelFactory(context)
                 )
                 val adminStoresViewModel: AdminStoresViewModel = viewModel()
+                val adminSectorsViewModel: AdminSectorsViewModel = viewModel()
                 val adminProductsViewModel: AdminProductsViewModel = viewModel(
                     factory = AdminProductsViewModelFactory()
                 )
@@ -76,6 +83,8 @@ class MainActivity : ComponentActivity() {
                 )
                 val operationalCenterViewModel: OperationalCenterViewModel = viewModel()
                 val reportsViewModel: ReportsViewModel = viewModel()
+                val requestProductViewModel: RequestProductViewModel = viewModel()
+                val productApprovalViewModel: ProductApprovalViewModel = viewModel()
                 val uiState by loginViewModel.uiState.collectAsStateWithLifecycle()
 
                 val authenticatedState = uiState.authState as? AuthState.Authenticated
@@ -83,6 +92,7 @@ class MainActivity : ComponentActivity() {
 
                 var currentScreen by remember { mutableStateOf("home") }
                 var selectedConferenceRequestId by remember { mutableStateOf("") }
+                var selectedStoreIdForSectors by remember { mutableStateOf("") }
                 var scannerSourceScreen by remember { mutableStateOf("new_request") }
 
                 // Intercepta a tecla voltar do sistema operacional Android para não fechar o app em telas secundárias
@@ -91,6 +101,9 @@ class MainActivity : ComponentActivity() {
                         "scanner" -> currentScreen = scannerSourceScreen
                         "new_request" -> currentScreen = "my_requests"
                         "conference_detail" -> currentScreen = "pending_conferences"
+                        "admin_sectors" -> currentScreen = "admin_stores"
+                        "request_product" -> currentScreen = "home"
+                        "product_approval" -> currentScreen = "home"
                         else -> currentScreen = "home"
                     }
                 }
@@ -116,8 +129,18 @@ class MainActivity : ComponentActivity() {
                     currentScreen == "admin_stores" -> {
                         AdminStoresScreen(
                             viewModel = adminStoresViewModel,
-                            onOpenSectors = { /* handled */ },
+                            onOpenSectors = { storeId ->
+                                selectedStoreIdForSectors = storeId
+                                currentScreen = "admin_sectors"
+                            },
                             onBackToHome = { currentScreen = "home" }
+                        )
+                    }
+                    currentScreen == "admin_sectors" -> {
+                        AdminSectorsScreen(
+                            storeId = selectedStoreIdForSectors,
+                            viewModel = adminSectorsViewModel,
+                            onBackToStores = { currentScreen = "admin_stores" }
                         )
                     }
                     currentScreen == "admin_audit" -> {
@@ -163,7 +186,30 @@ class MainActivity : ComponentActivity() {
                             onOpenScanner = {
                                 scannerSourceScreen = "products"
                                 currentScreen = "scanner"
+                            },
+                            onOpenApprovals = {
+                                currentScreen = "product_approval"
                             }
+                        )
+                    }
+                    currentScreen == "request_product" -> {
+                        val profile = (uiState.authState as AuthState.Authenticated).userProfile
+                        RequestProductScreen(
+                            viewModel = requestProductViewModel,
+                            userProfile = profile,
+                            onOpenScanner = {
+                                scannerSourceScreen = "request_product"
+                                currentScreen = "scanner"
+                            },
+                            onBackToHome = { currentScreen = "home" }
+                        )
+                    }
+                    currentScreen == "product_approval" -> {
+                        val profile = (uiState.authState as AuthState.Authenticated).userProfile
+                        ProductApprovalScreen(
+                            viewModel = productApprovalViewModel,
+                            userProfile = profile,
+                            onBackToHome = { currentScreen = "home" }
                         )
                     }
                     currentScreen == "history" -> {
@@ -222,14 +268,24 @@ class MainActivity : ComponentActivity() {
                             viewModel = scannerViewModel,
                             onBackToHome = { currentScreen = scannerSourceScreen },
                             onProductSelected = { product ->
-                                if (scannerSourceScreen == "products") {
-                                    adminProductsViewModel.startCreatingProduct()
-                                    adminProductsViewModel.onNewBarcodeChanged(product.barcode)
-                                    adminProductsViewModel.onNewNameChanged(product.name)
-                                    currentScreen = "products"
-                                } else {
-                                    newRequestViewModel.onProductScannedOrSelected(product)
-                                    currentScreen = "new_request"
+                                when (scannerSourceScreen) {
+                                    "products" -> {
+                                        adminProductsViewModel.startCreatingProduct()
+                                        adminProductsViewModel.onNewBarcodeChanged(product.barcode)
+                                        adminProductsViewModel.onNewNameChanged(product.name)
+                                        currentScreen = "products"
+                                    }
+                                    "request_product" -> {
+                                        requestProductViewModel.onBarcodeChanged(product.barcode)
+                                        if (product.name.isNotBlank()) {
+                                            requestProductViewModel.onNameChanged(product.name)
+                                        }
+                                        currentScreen = "request_product"
+                                    }
+                                    else -> {
+                                        newRequestViewModel.onProductScannedOrSelected(product)
+                                        currentScreen = "new_request"
+                                    }
                                 }
                             }
                         )
@@ -249,7 +305,9 @@ class MainActivity : ComponentActivity() {
                             onOpenMyRequests = { currentScreen = "my_requests" },
                             onOpenConferences = { currentScreen = "pending_conferences" },
                             onOpenHistory = { currentScreen = "history" },
-                            onOpenAuditLogs = { currentScreen = "admin_audit" }
+                            onOpenAuditLogs = { currentScreen = "admin_audit" },
+                            onOpenRequestProduct = { currentScreen = "request_product" },
+                            onOpenProductApproval = { currentScreen = "product_approval" }
                         )
                     }
                 }

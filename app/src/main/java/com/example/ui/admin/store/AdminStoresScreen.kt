@@ -251,22 +251,25 @@ private fun StoreItemCard(
     onDelete: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
         border = BorderStroke(1.dp, AppColors.BorderSubtle),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(40.dp)
                             .background(AppColors.PrimaryContainer, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
@@ -274,10 +277,10 @@ private fun StoreItemCard(
                             imageVector = Icons.Default.Store,
                             contentDescription = null,
                             tint = AppColors.Primary,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(22.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
                             text = store.name,
@@ -285,68 +288,82 @@ private fun StoreItemCard(
                             fontWeight = FontWeight.Bold,
                             color = AppColors.TextPrimary
                         )
-                        Text(
-                            text = "Código: ${store.code}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AppColors.TextSecondary
-                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Código: ${store.code}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AppColors.TextSecondary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (store.active) AppColors.StatusCompletedBg else AppColors.StatusDivergenceBg
+                            ) {
+                                Text(
+                                    text = if (store.active) "Ativa" else "Inativa",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (store.active) AppColors.StatusCompletedText else AppColors.StatusDivergenceText,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
                     }
                 }
-                Switch(
-                    checked = store.active,
-                    onCheckedChange = { onToggleActive() },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = AppColors.StatusCompleted
-                    )
-                )
-            }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = if (store.active) AppColors.StatusCompletedBg else AppColors.StatusDivergenceBg
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text(
-                        text = if (store.active) "Ativa" else "Inativa",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (store.active) AppColors.StatusCompletedText else AppColors.StatusDivergenceText,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                    )
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    IconButton(onClick = onDelete) {
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(40.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Excluir Loja",
-                            tint = AppColors.StatusDivergenceText
+                            tint = AppColors.StatusDivergenceText,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
-                    OutlinedButton(
-                        onClick = onEdit,
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, AppColors.BorderStrong),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.TextPrimary)
-                    ) {
-                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Editar")
-                    }
-                    Button(
-                        onClick = onManageSectors,
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = AppColors.Secondary)
-                    ) {
-                        Icon(Icons.Default.GridView, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Setores")
-                    }
+                    Switch(
+                        checked = store.active,
+                        onCheckedChange = { onToggleActive() },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = AppColors.StatusCompleted
+                        )
+                    )
+                }
+            }
+
+            // Ações Proporcionais (Editar e Gerenciar Setores)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onEdit,
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, AppColors.BorderStrong),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.TextPrimary),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Editar", maxLines = 1, softWrap = false, fontWeight = FontWeight.SemiBold)
+                }
+
+                Button(
+                    onClick = onManageSectors,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.Secondary),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.GridView, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Setores", maxLines = 1, softWrap = false, fontWeight = FontWeight.Bold)
                 }
             }
         }

@@ -4,6 +4,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.example.core.data.WithdrawalRequestRepository
+import com.example.core.data.ProductRegistrationRepository
 import com.example.core.data.RequestStatusCounts
 
 import androidx.compose.foundation.BorderStroke
@@ -27,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.CameraAlt
@@ -39,6 +41,7 @@ import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PlaylistAddCheck
 import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Store
@@ -95,11 +98,15 @@ fun HomeAuthenticatedScreen(
     onOpenConferences: (() -> Unit)? = null,
     onOpenHistory: (() -> Unit)? = null,
     onOpenAuditLogs: (() -> Unit)? = null,
+    onOpenRequestProduct: (() -> Unit)? = null,
+    onOpenProductApproval: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val withdrawalRepo = remember { WithdrawalRequestRepository() }
+    val productRegRepo = remember { ProductRegistrationRepository() }
     val summaryCounts by withdrawalRepo.getSummaryFlow(userProfile).collectAsState(initial = RequestStatusCounts())
+    val pendingProductRequestsCount by productRegRepo.getPendingCountFlow(userProfile).collectAsState(initial = 0)
 
     val historyButtonLabel = when (userProfile.role) {
         UserRole.ADMIN -> "Histórico Geral de Baixas"
@@ -415,6 +422,17 @@ fun HomeAuthenticatedScreen(
                         )
                     }
 
+                    if (onOpenRequestProduct != null) {
+                        ActionCardButton(
+                            title = "Solicitar Cadastro de Produto",
+                            subtitle = "Tirar foto e solicitar novo item para ${userProfile.sectorId.ifBlank { "o setor" }}",
+                            icon = Icons.Default.AddAPhoto,
+                            iconColor = Color(0xFF0D9488),
+                            onClick = onOpenRequestProduct,
+                            modifier = Modifier.testTag("btn_open_request_product")
+                        )
+                    }
+
                     if (onOpenProducts != null) {
                         ActionCardButton(
                             title = "Consultar Catálogo de Produtos",
@@ -534,6 +552,17 @@ fun HomeAuthenticatedScreen(
                         )
                     }
 
+                    if (onOpenProductApproval != null) {
+                        ActionCardButton(
+                            title = "Aprovar Cadastros de Produtos",
+                            subtitle = if (pendingProductRequestsCount > 0) "$pendingProductRequestsCount solicitação(ões) pendente(s) da unidade" else "Analisar fotos e descrições solicitadas pelos setores",
+                            icon = Icons.Default.PlaylistAddCheck,
+                            iconColor = Color(0xFF0D9488),
+                            onClick = onOpenProductApproval,
+                            modifier = Modifier.testTag("btn_open_product_approval")
+                        )
+                    }
+
                     if (onOpenProducts != null) {
                         ActionCardButton(
                             title = "Consultar Catálogo de Produtos",
@@ -607,6 +636,17 @@ fun HomeAuthenticatedScreen(
                             iconColor = Color(0xFF0D9488),
                             onClick = onOpenStores,
                             modifier = Modifier.testTag("btn_open_stores")
+                        )
+                    }
+
+                    if (onOpenProductApproval != null) {
+                        ActionCardButton(
+                            title = "Aprovar Cadastros de Produtos",
+                            subtitle = if (pendingProductRequestsCount > 0) "$pendingProductRequestsCount solicitação(ões) pendente(s) na rede" else "Aprovar ou recusar solicitações de novos itens",
+                            icon = Icons.Default.PlaylistAddCheck,
+                            iconColor = Color(0xFF0D9488),
+                            onClick = onOpenProductApproval,
+                            modifier = Modifier.testTag("btn_open_product_approval_admin")
                         )
                     }
 

@@ -37,7 +37,7 @@ fun UserItemCard(
             .fillMaxWidth()
             .testTag("user_card_${user.uid}")
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -94,7 +94,7 @@ fun UserItemCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -163,7 +163,7 @@ fun UserItemCard(
 
             // Ação administrativa: Permitir / Bloquear alteração de senha
             if (user.role != UserRole.ADMIN) {
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,

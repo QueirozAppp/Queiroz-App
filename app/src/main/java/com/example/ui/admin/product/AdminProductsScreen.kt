@@ -70,6 +70,8 @@ import com.example.ui.components.AppEmptyState
 import com.example.ui.components.AppErrorBanner
 import com.example.ui.components.AppSectionHeader
 
+import androidx.compose.material.icons.filled.PlaylistAddCheck
+
 /**
  * Tela de Gestão e Cadastro de Produtos no Catálogo Global da Rede redesenhada (Etapa 20).
  * Interface limpa com busca instantânea, badges de unidade/status e preservação de testTags.
@@ -81,6 +83,7 @@ fun AdminProductsScreen(
     onBackToHome: () -> Unit,
     isAdmin: Boolean = true,
     onOpenScanner: (() -> Unit)? = null,
+    onOpenApprovals: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -111,6 +114,20 @@ fun AdminProductsScreen(
                             contentDescription = "Voltar",
                             tint = AppColors.TextPrimary
                         )
+                    }
+                },
+                actions = {
+                    if (onOpenApprovals != null) {
+                        IconButton(
+                            onClick = onOpenApprovals,
+                            modifier = Modifier.testTag("btn_top_product_approvals")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlaylistAddCheck,
+                                contentDescription = "Solicitações de Cadastro",
+                                tint = AppColors.Primary
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
