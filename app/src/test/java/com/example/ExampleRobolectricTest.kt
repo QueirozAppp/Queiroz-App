@@ -35,7 +35,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 class ExampleRobolectricTest {
 
     @Test
@@ -173,6 +173,31 @@ class ExampleRobolectricTest {
         assertTrue(state.allowedRolesToCreate.contains(UserRole.AVARISTA))
         assertTrue(state.allowedRolesToCreate.contains(UserRole.SETOR_LEADER))
         assertTrue(state.allowedRolesToCreate.contains(UserRole.ADMIN))
+    }
+
+    @Test
+    fun `admin users viewmodel initializes initial password to queiroz123 and validates minimum length`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val viewModel = AdminUsersViewModel(AdminUserRepository(context))
+
+        // Default in uiState
+        assertEquals("queiroz123", viewModel.uiState.value.newPassword)
+
+        // After startCreatingUser()
+        viewModel.startCreatingUser()
+        assertEquals("queiroz123", viewModel.uiState.value.newPassword)
+
+        // Change password
+        viewModel.onNewPasswordChanged("customPass99")
+        assertEquals("customPass99", viewModel.uiState.value.newPassword)
+
+        // Too short password validation
+        viewModel.onNewNameChanged("User Test")
+        viewModel.onNewEmailChanged("user@test.com")
+        viewModel.onNewStoreChanged("LOJA_01")
+        viewModel.onNewPasswordChanged("123")
+        viewModel.createUser()
+        assertEquals("A senha inicial deve ter no mínimo 6 caracteres.", viewModel.uiState.value.errorMessage)
     }
 
     @Test

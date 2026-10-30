@@ -363,7 +363,7 @@ fun LoginScreen(
                         )
 
                         Text(
-                            text = "Primeiro acesso? A senha digitada aqui será gravada como sua senha definitiva.",
+                            text = "Primeiro acesso? Utilize a senha inicial (padrão: queiroz123) para cadastrar sua nova senha definitiva.",
                             style = MaterialTheme.typography.labelSmall,
                             color = AppColors.TextSecondary,
                             modifier = Modifier.padding(start = 4.dp, top = 2.dp)

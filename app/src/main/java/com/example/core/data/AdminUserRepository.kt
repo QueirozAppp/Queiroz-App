@@ -208,7 +208,7 @@ class AdminUserRepository(
             val secondaryAuth = FirebaseAuth.getInstance(secondaryApp)
 
             var isRecoveredFromPartial = false
-            val initialPass = if (trimmedPass.isNotBlank()) trimmedPass else "senha123"
+            val initialPass = if (trimmedPass.isNotBlank()) trimmedPass else "queiroz123"
             val newUid: String = try {
                 val authResult = kotlinx.coroutines.withTimeout(15000L) {
                     secondaryAuth.createUserWithEmailAndPassword(trimmedEmail, initialPass).await()

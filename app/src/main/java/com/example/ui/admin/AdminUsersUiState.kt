@@ -16,7 +16,7 @@ data class AdminUsersUiState(
     val isCreatingUser: Boolean = false,
     val newName: String = "",
     val newEmail: String = "",
-    val newPassword: String = "",
+    val newPassword: String = "queiroz123",
     val newRole: UserRole = UserRole.AVARISTA,
     val newStoreId: String = "",
     val newSectorId: String = "",

@@ -9,6 +9,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Store
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,6 +19,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.core.model.UserRole
 import com.example.ui.components.AppColors
@@ -31,6 +35,7 @@ fun CreateUserForm(
     var expandedRoleMenu by remember { mutableStateOf(false) }
     var expandedStoreMenu by remember { mutableStateOf(false) }
     var expandedSectorMenu by remember { mutableStateOf(false) }
+    var isPasswordVisible by remember { mutableStateOf(false) }
 
     var showAddStoreDialog by remember { mutableStateOf(false) }
     var newStoreCode by remember { mutableStateOf("") }
@@ -94,6 +99,44 @@ fun CreateUserForm(
                     .testTag("input_new_email")
             )
 
+            // Initial Password Input
+            OutlinedTextField(
+                value = uiState.newPassword,
+                onValueChange = viewModel::onNewPasswordChanged,
+                label = { Text("Senha Inicial (Padrão: queiroz123)") },
+                placeholder = { Text("queiroz123") },
+                supportingText = {
+                    Text(
+                        text = "Senha padrão para todos: queiroz123 (mínimo 6 caracteres)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AppColors.TextSecondary
+                    )
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(10.dp),
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = null,
+                        tint = AppColors.TextSecondary
+                    )
+                },
+                trailingIcon = {
+                    IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                        Icon(
+                            imageVector = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = if (isPasswordVisible) "Ocultar senha" else "Exibir senha",
+                            tint = AppColors.TextTertiary
+                        )
+                    }
+                },
+                visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("input_new_password")
+            )
+
             // First Access Password Notice
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -111,13 +154,13 @@ fun CreateUserForm(
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
                     Text(
-                        text = "Senha no Primeiro Acesso",
+                        text = "Troca Obrigatória no Primeiro Acesso",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = AppColors.OnPrimaryContainer
                     )
                     Text(
-                        text = "O novo usuário definirá sua senha definitiva na primeira vez que entrar no aplicativo. Essa senha só poderá ser alterada com sua autorização.",
+                        text = "O novo usuário entrará com esta senha inicial e o sistema abrirá imediatamente a tela para ele cadastrar sua senha definitiva pessoal. Essa senha definitiva só poderá ser alterada futuramente com autorização do administrador.",
                         style = MaterialTheme.typography.bodySmall,
                         color = AppColors.OnPrimaryContainer.copy(alpha = 0.85f)
                     )

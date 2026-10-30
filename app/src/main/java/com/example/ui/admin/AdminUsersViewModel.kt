@@ -91,7 +91,7 @@ class AdminUsersViewModel(
                 isCreatingUser = true,
                 newName = "",
                 newEmail = "",
-                newPassword = "",
+                newPassword = "queiroz123",
                 newRole = UserRole.AVARISTA,
                 newStoreId = firstStore,
                 newSectorId = "",
@@ -150,6 +150,12 @@ class AdminUsersViewModel(
             return
         }
 
+        val initialPassword = state.newPassword.trim().ifEmpty { "queiroz123" }
+        if (initialPassword.length < 6) {
+            _uiState.update { it.copy(errorMessage = "A senha inicial deve ter no mínimo 6 caracteres.") }
+            return
+        }
+
         viewModelScope.launch {
             android.util.Log.i("AdminUsersViewModel", "FIM_CADASTRO_INICIO")
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
@@ -158,7 +164,7 @@ class AdminUsersViewModel(
             val result = adminRepository.createUser(
                 name = state.newName,
                 email = state.newEmail,
-                pass = "senha123", // Automatic initial password!
+                pass = initialPassword,
                 role = state.newRole,
                 storeId = finalStoreId,
                 sectorId = finalSectorId
@@ -170,7 +176,7 @@ class AdminUsersViewModel(
                         it.copy(
                             isLoading = false,
                             isCreatingUser = false,
-                            successMessage = "Usuário ${state.newName} cadastrado! A senha definitiva será criada por ele no primeiro acesso."
+                            successMessage = "Usuário ${state.newName} cadastrado! Senha inicial: '$initialPassword'. A senha definitiva será criada por ele no primeiro acesso."
                         )
                     }
                     refreshUsers()
