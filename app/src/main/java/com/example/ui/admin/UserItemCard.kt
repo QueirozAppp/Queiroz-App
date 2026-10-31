@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
@@ -26,6 +27,7 @@ fun UserItemCard(
     user: UserProfile,
     onToggleActive: () -> Unit,
     onTogglePasswordPermission: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     Card(
@@ -43,7 +45,10 @@ fun UserItemCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Box(
                         modifier = Modifier
                             .size(36.dp)
@@ -58,47 +63,70 @@ fun UserItemCard(
                         )
                     }
                     Spacer(modifier = Modifier.width(10.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f, fill = false)) {
                         Text(
                             text = user.name.ifEmpty { "Sem Nome" },
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = AppColors.TextPrimary
+                            color = AppColors.TextPrimary,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
                         Text(
                             text = user.email,
                             style = MaterialTheme.typography.bodySmall,
-                            color = AppColors.TextSecondary
+                            color = AppColors.TextSecondary,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
                     }
                 }
 
-                Switch(
-                    checked = user.active,
-                    onCheckedChange = { onToggleActive() },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = AppColors.StatusCompleted
-                    ),
-                    modifier = Modifier.testTag("switch_active_${user.uid}")
-                )
-                IconButton(
-                    onClick = { onDelete() },
-                    modifier = Modifier.testTag("btn_delete_user_${user.uid}")
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Excluir Usuário",
-                        tint = AppColors.StatusDivergenceText
+                    Switch(
+                        checked = user.active,
+                        onCheckedChange = { onToggleActive() },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = AppColors.StatusCompleted
+                        ),
+                        modifier = Modifier.testTag("switch_active_${user.uid}")
                     )
+                    IconButton(
+                        onClick = onEdit,
+                        modifier = Modifier.size(36.dp).testTag("btn_edit_user_${user.uid}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Editar Usuário",
+                            tint = AppColors.Primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = { onDelete() },
+                        modifier = Modifier.size(36.dp).testTag("btn_delete_user_${user.uid}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Excluir Usuário",
+                            tint = AppColors.StatusDivergenceText,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            Row(
+            @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+            androidx.compose.foundation.layout.FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Surface(
                     shape = RoundedCornerShape(6.dp),
@@ -109,7 +137,9 @@ fun UserItemCard(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = AppColors.Primary
+                        color = AppColors.Primary,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
 
@@ -122,7 +152,9 @@ fun UserItemCard(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = AppColors.OnSecondaryContainer
+                        color = AppColors.OnSecondaryContainer,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
 
@@ -136,7 +168,9 @@ fun UserItemCard(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = AppColors.TextSecondary
+                            color = AppColors.TextSecondary,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }
@@ -156,7 +190,9 @@ fun UserItemCard(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = pwdText
+                        color = pwdText,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
             }

@@ -208,13 +208,19 @@ fun AdminStoresScreen(
                             value = uiState.storeNameInput,
                             onValueChange = viewModel::onStoreNameChanged,
                             label = { Text("Nome da Loja") },
+                            placeholder = { Text("Ex: Filial Centro") },
+                            singleLine = true,
+                            maxLines = 1,
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
                             value = uiState.storeCodeInput,
                             onValueChange = viewModel::onStoreCodeChanged,
-                            label = { Text("Código (Ex: LOJA_01)") },
+                            label = { Text("Código da Loja") },
+                            placeholder = { Text("Ex: LOJA_01") },
+                            singleLine = true,
+                            maxLines = 1,
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth()
                         )

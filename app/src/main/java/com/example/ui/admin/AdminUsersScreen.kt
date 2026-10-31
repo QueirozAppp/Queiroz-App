@@ -154,6 +154,7 @@ fun AdminUsersScreen(
         }
     ) { innerPadding ->
         var showDeleteConfirmation by remember { mutableStateOf<UserProfile?>(null) }
+        var userToEdit by remember { mutableStateOf<UserProfile?>(null) }
         
         Column(
             modifier = Modifier
@@ -161,6 +162,131 @@ fun AdminUsersScreen(
                 .padding(innerPadding)
                 .padding(16.dp)
         ) {
+            // Edit User Dialog
+            userToEdit?.let { targetUser ->
+                var editName by remember { mutableStateOf(targetUser.name) }
+                var editRole by remember { mutableStateOf(targetUser.role) }
+                var editStoreId by remember { mutableStateOf(targetUser.storeId) }
+                var editSectorId by remember { mutableStateOf(targetUser.sectorId) }
+                var expandedRoleMenu by remember { mutableStateOf(false) }
+
+                AlertDialog(
+                    onDismissRequest = { userToEdit = null },
+                    title = {
+                        Text(
+                            text = "Editar Dados do Usuário",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = AppColors.TextPrimary
+                        )
+                    },
+                    text = {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "E-mail: ${targetUser.email}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AppColors.TextSecondary
+                            )
+
+                            OutlinedTextField(
+                                value = editName,
+                                onValueChange = { editName = it },
+                                label = { Text("Nome Completo") },
+                                singleLine = true,
+                                maxLines = 1,
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth().testTag("input_edit_user_name")
+                            )
+
+                            // Cargo
+                            ExposedDropdownMenuBox(
+                                expanded = expandedRoleMenu,
+                                onExpandedChange = { expandedRoleMenu = it },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                OutlinedTextField(
+                                    value = editRole.label,
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    label = { Text("Cargo / Função") },
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(10.dp),
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedRoleMenu) },
+                                    modifier = Modifier.fillMaxWidth().menuAnchor()
+                                )
+                                ExposedDropdownMenu(
+                                    expanded = expandedRoleMenu,
+                                    onDismissRequest = { expandedRoleMenu = false },
+                                    modifier = Modifier.background(AppColors.Surface)
+                                ) {
+                                    UserRole.values().forEach { r ->
+                                        DropdownMenuItem(
+                                            text = { Text(r.label, color = AppColors.TextPrimary) },
+                                            onClick = {
+                                                editRole = r
+                                                expandedRoleMenu = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Loja
+                            OutlinedTextField(
+                                value = editStoreId,
+                                onValueChange = { editStoreId = it },
+                                label = { Text("Loja (ex: LOJA_01, LOJA_05)") },
+                                singleLine = true,
+                                maxLines = 1,
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth().testTag("input_edit_user_store")
+                            )
+
+                            // Setor
+                            OutlinedTextField(
+                                value = editSectorId,
+                                onValueChange = { editSectorId = it },
+                                label = { Text("Setor (ex: ACOUGUE, PADARIA, GERAL)") },
+                                singleLine = true,
+                                maxLines = 1,
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth().testTag("input_edit_user_sector")
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                viewModel.updateUserProfile(
+                                    user = targetUser,
+                                    newName = editName,
+                                    newRole = editRole,
+                                    newStoreId = editStoreId,
+                                    newSectorId = editSectorId
+                                )
+                                userToEdit = null
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
+                            modifier = Modifier.testTag("btn_confirm_edit_user")
+                        ) {
+                            Text("Salvar Alterações", fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        OutlinedButton(
+                            onClick = { userToEdit = null },
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Cancelar")
+                        }
+                    }
+                )
+            }
+
             // Confirmation Dialog for User Deletion
             showDeleteConfirmation?.let { userToDelete ->
                 AlertDialog(
@@ -278,6 +404,7 @@ fun AdminUsersScreen(
                                 user = user,
                                 onToggleActive = { viewModel.toggleUserActive(user.uid, user.active) },
                                 onTogglePasswordPermission = { viewModel.toggleAllowPasswordChange(user) },
+                                onEdit = { userToEdit = user },
                                 onDelete = { showDeleteConfirmation = user }
                             )
                         }

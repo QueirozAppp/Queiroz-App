@@ -520,9 +520,53 @@ class WithdrawalRequestRepository(
     }
 
     /**
+     * Cancela ou exclui uma solicitação informando obrigatoriamente o motivo (Avarista ou Administrador).
+     */
+    suspend fun cancelOrDeleteRequest(
+        requestId: String,
+        cancellationReason: String,
+        userProfile: UserProfile
+    ): Result<Unit> {
+        val db = firestore ?: return Result.failure(IllegalStateException("Firestore não inicializado."))
+        val trimmedReason = cancellationReason.trim()
+        if (trimmedReason.isBlank()) {
+            return Result.failure(IllegalArgumentException("É obrigatório informar o motivo para cancelar/excluir a solicitação."))
+        }
+        return try {
+            val now = System.currentTimeMillis()
+            db.collection("withdrawalRequests").document(requestId).update(
+                mapOf(
+                    "status" to "CANCELLED",
+                    "cancellationReason" to trimmedReason,
+                    "cancelledByUid" to userProfile.uid,
+                    "cancelledByName" to userProfile.name,
+                    "cancelledAt" to now,
+                    "updatedAt" to now
+                )
+            ).await()
+
+            auditRepository.logEvent(
+                action = AuditAction.CONFERENCE_CANCELLED,
+                entityType = AuditEntityType.WITHDRAWAL_REQUEST,
+                entityId = requestId,
+                userId = userProfile.uid,
+                userName = userProfile.name,
+                userRole = userProfile.role.name,
+                storeId = userProfile.storeId,
+                description = "Solicitação excluída/cancelada na conferência. Motivo: $trimmedReason",
+                metadata = mapOf("cancellationReason" to trimmedReason, "requestId" to requestId)
+            )
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
      * Consulta o histórico de solicitações com base no perfil do usuário, respeitando as regras de segurança do Firestore.
      */
-    suspend fun fetchHistoryRequests(userProfile: UserProfile, limitCount: Long = 30L): Result<List<WithdrawalRequest>> {
+    suspend fun fetchHistoryRequests(userProfile: UserProfile, limitCount: Long = 50L): Result<List<WithdrawalRequest>> {
         val db = firestore ?: return Result.failure(IllegalStateException("Firestore não inicializado."))
         return try {
             var query: com.google.firebase.firestore.Query = db.collection("withdrawalRequests")
@@ -532,23 +576,32 @@ class WithdrawalRequestRepository(
                     // ADMIN pode consultar de todas as lojas
                 }
                 UserRole.AVARISTA -> {
-                    query = query.whereEqualTo("storeId", userProfile.storeId)
+                    if (userProfile.storeId.isNotBlank()) {
+                        query = query.whereEqualTo("storeId", userProfile.storeId.trim())
+                    }
                 }
                 UserRole.SETOR_LEADER -> {
                     query = query.whereEqualTo("requestedBy", userProfile.uid)
                 }
             }
 
-            val snapshot = query.orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
-                .limit(limitCount)
-                .get()
-                .await()
+            val snapshot = try {
+                query.orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                    .limit(limitCount)
+                    .get()
+                    .await()
+            } catch (queryEx: Exception) {
+                android.util.Log.w("WithdrawalRequestRepo", "Fallback sem orderBy no Firestore para evitar erro de índice: ${queryEx.message}")
+                query.limit(limitCount).get().await()
+            }
 
             val list = snapshot.documents.mapNotNull { doc ->
                 doc.toObject(WithdrawalRequest::class.java)?.copy(id = doc.id)
-            }
+            }.sortedByDescending { it.createdAt }
+
             Result.success(list)
         } catch (e: Exception) {
+            android.util.Log.e("WithdrawalRequestRepo", "Erro ao carregar histórico: ${e.message}", e)
             Result.failure(e)
         }
     }

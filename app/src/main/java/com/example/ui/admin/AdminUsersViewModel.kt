@@ -251,6 +251,49 @@ class AdminUsersViewModel(
         }
     }
 
+    fun updateUserProfile(
+        user: com.example.core.model.UserProfile,
+        newName: String,
+        newRole: UserRole,
+        newStoreId: String,
+        newSectorId: String
+    ) {
+        val trimmedName = newName.trim()
+        if (trimmedName.isBlank()) {
+            _uiState.update { it.copy(errorMessage = "O nome não pode estar vazio.") }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            val result = adminRepository.updateUserProfile(
+                uid = user.uid,
+                name = trimmedName,
+                role = newRole,
+                storeId = newStoreId,
+                sectorId = newSectorId
+            )
+            result.fold(
+                onSuccess = {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            successMessage = "Dados do usuário $trimmedName atualizados com sucesso!"
+                        )
+                    }
+                    refreshUsers()
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = "Erro ao atualizar dados: ${err.localizedMessage ?: err.message}"
+                        )
+                    }
+                }
+            )
+        }
+    }
+
     fun clearMessages() {
         _uiState.update { it.copy(errorMessage = null, successMessage = null) }
     }

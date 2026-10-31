@@ -361,6 +361,50 @@ class AdminUserRepository(
     }
 
     /**
+     * Atualiza os dados completos de um usuário (nome, cargo, loja e setor).
+     */
+    suspend fun updateUserProfile(
+        uid: String,
+        name: String,
+        role: UserRole,
+        storeId: String,
+        sectorId: String
+    ): Result<Unit> {
+        val db = firestore ?: return Result.failure(IllegalStateException("Firestore não inicializado."))
+        val trimmedName = name.trim()
+        if (trimmedName.isBlank()) {
+            return Result.failure(IllegalArgumentException("O nome do usuário não pode ser vazio."))
+        }
+        return try {
+            val updates = mutableMapOf<String, Any>(
+                "name" to trimmedName,
+                "role" to role.name,
+                "storeId" to storeId,
+                "sectorId" to sectorId
+            )
+            db.collection("users").document(uid).update(updates).await()
+
+            val currentAdminUid = try { FirebaseProvider.getAuthOrNull()?.currentUser?.uid } catch (_: Exception) { null } ?: "admin_system"
+            auditRepository.logEvent(
+                action = AuditAction.USER_STORE_CHANGED,
+                entityType = AuditEntityType.USER,
+                entityId = uid,
+                userId = currentAdminUid,
+                userName = "Administrador",
+                userRole = "ADMIN",
+                storeId = storeId,
+                sectorId = sectorId,
+                description = "Perfil do usuário $trimmedName atualizado (Cargo: ${role.label}, Loja: $storeId, Setor: $sectorId)",
+                metadata = mapOf("name" to trimmedName, "role" to role.name, "storeId" to storeId, "sectorId" to sectorId)
+            )
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
      * Altera vínculos administrativos (loja e setor) de um usuário operacional.
      */
     suspend fun updateUserStoreAndSector(uid: String, oldStoreId: String, newStoreId: String, oldSectorId: String, newSectorId: String): Result<Unit> {

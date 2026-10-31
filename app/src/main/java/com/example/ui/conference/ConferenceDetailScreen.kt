@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Warning
@@ -91,6 +92,8 @@ fun ConferenceDetailScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showConfirmDialog by remember { mutableStateOf(false) }
+    var showCancelDialog by remember { mutableStateOf(false) }
+    var cancelReasonInput by remember { mutableStateOf("") }
     var showAddEvidenceDialog by remember { mutableStateOf(false) }
     var pendingImageBytes by remember { mutableStateOf<ByteArray?>(null) }
     var evidenceDescriptionInput by remember { mutableStateOf("") }
@@ -395,6 +398,28 @@ fun ConferenceDetailScreen(
                                 )
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        OutlinedButton(
+                            onClick = { showCancelDialog = true },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.StatusDivergenceText),
+                            border = BorderStroke(1.dp, AppColors.StatusDivergence),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .testTag("btn_cancel_conference_request")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = AppColors.StatusDivergenceText
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Excluir / Cancelar Solicitação", fontWeight = FontWeight.Bold)
+                        }
                     }
                 } else {
                     OutlinedButton(
@@ -548,6 +573,74 @@ fun ConferenceDetailScreen(
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text("Cancelar")
+                    }
+                }
+            )
+        }
+
+        // Dialog for Cancelling/Deleting Conference Request with Mandatory Reason
+        if (showCancelDialog) {
+            AlertDialog(
+                onDismissRequest = { showCancelDialog = false },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = AppColors.StatusDivergence
+                    )
+                },
+                title = {
+                    Text(
+                        text = "Excluir / Cancelar Solicitação",
+                        fontWeight = FontWeight.Bold,
+                        color = AppColors.TextPrimary
+                    )
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            text = "Informe obrigatoriamente o motivo pelo qual esta solicitação está sendo excluída/cancelada da conferência:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AppColors.TextSecondary
+                        )
+                        OutlinedTextField(
+                            value = cancelReasonInput,
+                            onValueChange = { cancelReasonInput = it },
+                            label = { Text("Motivo do Cancelamento *") },
+                            placeholder = { Text("Ex: Produtos lançados indevidamente pelo setor...") },
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = false,
+                            minLines = 3,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("input_cancellation_reason")
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (cancelReasonInput.trim().isNotBlank()) {
+                                showCancelDialog = false
+                                viewModel.cancelRequest(cancelReasonInput, userProfile) {
+                                    onBackToList()
+                                }
+                            }
+                        },
+                        enabled = cancelReasonInput.trim().isNotBlank(),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AppColors.StatusDivergence),
+                        modifier = Modifier.testTag("btn_confirm_cancel_request")
+                    ) {
+                        Text("Confirmar Exclusão", fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    OutlinedButton(
+                        onClick = { showCancelDialog = false },
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Voltar")
                     }
                 }
             )

@@ -237,6 +237,8 @@ fun LoginScreen(
                                 value = selectedStoreName,
                                 onValueChange = {},
                                 readOnly = true,
+                                singleLine = true,
+                                maxLines = 1,
                                 label = { Text("Unidade / Loja") },
                                 leadingIcon = {
                                     Icon(Icons.Default.Store, contentDescription = null, tint = AppColors.Primary)
@@ -391,91 +393,6 @@ fun LoginScreen(
                             isLoading = uiState.isLoading,
                             modifier = Modifier.testTag("login_button")
                         )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                        ) {
-                            Box(modifier = Modifier.weight(1f).height(1.dp).background(AppColors.BorderSubtle))
-                            Text(
-                                text = "ou",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = AppColors.TextTertiary,
-                                modifier = Modifier.padding(horizontal = 8.dp)
-                            )
-                            Box(modifier = Modifier.weight(1f).height(1.dp).background(AppColors.BorderSubtle))
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        OutlinedButton(
-                            onClick = {
-                                /* Store selection check delegated to AuthRepository */
-
-                                val activity = context as? android.app.Activity
-                                if (activity == null) {
-                                    viewModel.setErrorMessage("Contexto de tela inválido para iniciar autenticação com o Google.")
-                                    return@OutlinedButton
-                                }
-
-                                val credentialManager = androidx.credentials.CredentialManager.create(context)
-                                val signInOption = com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption.Builder(serverClientId = "196784493285-a7732s5k7c88219v991j2e1k75988358.apps.googleusercontent.com").build()
-                                val request = androidx.credentials.GetCredentialRequest.Builder()
-                                    .addCredentialOption(signInOption)
-                                    .build()
-
-                                coroutineScope.launch {
-                                    try {
-                                        viewModel.setLoading(true)
-                                        val result = credentialManager.getCredential(activity, request)
-                                        val credential = result.credential
-                                        if (credential is androidx.credentials.CustomCredential &&
-                                            credential.type == com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
-                                        ) {
-                                            val googleIdToken = com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.createFrom(credential.data).idToken
-                                            viewModel.onGoogleLoginResult(idToken = googleIdToken, selectedStoreId = uiState.selectedStoreId)
-                                        } else {
-                                            viewModel.setErrorMessage("Tipo de credencial Google inválida.")
-                                        }
-                                    } catch (e: androidx.credentials.exceptions.GetCredentialCancellationException) {
-                                        android.util.Log.w("LoginScreen", "Login com Google cancelado pelo usuário.")
-                                        viewModel.setLoading(false)
-                                    } catch (e: Exception) {
-                                        android.util.Log.e("LoginScreen", "Erro no Login com Google: ${e.message}", e)
-                                        viewModel.setDebugErrorMessage(e.message)
-                                        viewModel.setErrorMessage(e.localizedMessage ?: "Falha ao selecionar conta Google.")
-                                    }
-                                }
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, AppColors.BorderStrong),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = AppColors.TextPrimary
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                                .testTag("btn_google_login")
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                Text(
-                                    text = "G  ",
-                                    color = Color(0xFFEA4335),
-                                    fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-                                Text(
-                                    text = "Continuar com Google",
-                                    fontWeight = FontWeight.SemiBold,
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
-                        }
                     }
                 }
             }

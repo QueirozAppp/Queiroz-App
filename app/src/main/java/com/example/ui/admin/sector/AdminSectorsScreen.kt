@@ -177,14 +177,20 @@ fun AdminSectorsScreen(
                         OutlinedTextField(
                             value = uiState.sectorNameInput,
                             onValueChange = viewModel::onSectorNameChanged,
-                            label = { Text("Nome do Setor (Ex: Padaria)") },
+                            label = { Text("Nome do Setor") },
+                            placeholder = { Text("Ex: Padaria") },
+                            singleLine = true,
+                            maxLines = 1,
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
                             value = uiState.sectorCodeInput,
                             onValueChange = viewModel::onSectorCodeChanged,
-                            label = { Text("Código (Ex: PADARIA)") },
+                            label = { Text("Código do Setor") },
+                            placeholder = { Text("Ex: PADARIA") },
+                            singleLine = true,
+                            maxLines = 1,
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth()
                         )

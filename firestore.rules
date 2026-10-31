@@ -62,6 +62,11 @@ service cloud.firestore {
       }
     }
 
+    // Regras de Solicitações de Cadastro de Produtos (Product Registration Requests)
+    match /productRegistrationRequests/{reqId} {
+      allow read, write: if isAuthenticated();
+    }
+
     // Regras de Logs de Auditoria (AuditLogs - Imutáveis)
     match /auditLogs/{auditId} {
       allow read: if isAuthenticated();

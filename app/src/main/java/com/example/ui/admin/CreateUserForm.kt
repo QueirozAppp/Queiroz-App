@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.core.model.UserRole
 import com.example.ui.components.AppColors
@@ -78,8 +79,9 @@ fun CreateUserForm(
             OutlinedTextField(
                 value = uiState.newName,
                 onValueChange = viewModel::onNewNameChanged,
-                label = { Text("Nome Completo") },
+                label = { Text("Nome Completo", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 singleLine = true,
+                maxLines = 1,
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -90,8 +92,9 @@ fun CreateUserForm(
             OutlinedTextField(
                 value = uiState.newEmail,
                 onValueChange = viewModel::onNewEmailChanged,
-                label = { Text("E-mail corporativo") },
+                label = { Text("E-mail corporativo", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 singleLine = true,
+                maxLines = 1,
                 shape = RoundedCornerShape(10.dp),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 modifier = Modifier
@@ -103,16 +106,19 @@ fun CreateUserForm(
             OutlinedTextField(
                 value = uiState.newPassword,
                 onValueChange = viewModel::onNewPasswordChanged,
-                label = { Text("Senha Inicial (Padrão: queiroz123)") },
-                placeholder = { Text("queiroz123") },
+                label = { Text("Senha inicial", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                placeholder = { Text("queiroz123", maxLines = 1) },
                 supportingText = {
                     Text(
-                        text = "Senha padrão para todos: queiroz123 (mínimo 6 caracteres)",
+                        text = "Senha padrão: queiroz123 (mínimo 6 caracteres)",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.bodySmall,
                         color = AppColors.TextSecondary
                     )
                 },
                 singleLine = true,
+                maxLines = 1,
                 shape = RoundedCornerShape(10.dp),
                 leadingIcon = {
                     Icon(
@@ -152,17 +158,18 @@ fun CreateUserForm(
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(10.dp))
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Troca Obrigatória no Primeiro Acesso",
-                        style = MaterialTheme.typography.labelLarge,
+                        style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = AppColors.OnPrimaryContainer
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "O novo usuário entrará com esta senha inicial e o sistema abrirá imediatamente a tela para ele cadastrar sua senha definitiva pessoal. Essa senha definitiva só poderá ser alterada futuramente com autorização do administrador.",
+                        text = "O novo usuário entrará com a senha inicial (padrão: queiroz123) e definirá a definitiva no primeiro acesso.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = AppColors.OnPrimaryContainer.copy(alpha = 0.85f)
+                        color = AppColors.OnPrimaryContainer.copy(alpha = 0.9f)
                     )
                 }
             }
@@ -177,7 +184,9 @@ fun CreateUserForm(
                     value = uiState.newRole.label,
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text("Função (Role)") },
+                    label = { Text("Função", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    singleLine = true,
+                    maxLines = 1,
                     shape = RoundedCornerShape(10.dp),
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedRoleMenu) },
                     modifier = Modifier
@@ -235,7 +244,9 @@ fun CreateUserForm(
                             value = selectedStoreName,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Loja Vinculada") },
+                            label = { Text("Loja Vinculada", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            singleLine = true,
+                            maxLines = 1,
                             shape = RoundedCornerShape(10.dp),
                             leadingIcon = { Icon(Icons.Default.Store, contentDescription = null) },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedStoreMenu) },
@@ -301,8 +312,10 @@ fun CreateUserForm(
                                     newStoreName = it 
                                     storeDialogError = null
                                 },
-                                label = { Text("Nome da Loja (ex: Filial Centro)") },
+                                label = { Text("Nome da Loja", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                placeholder = { Text("Ex: Filial Centro") },
                                 singleLine = true,
+                                maxLines = 1,
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.fillMaxWidth().testTag("input_new_store_name")
                             )
@@ -312,8 +325,10 @@ fun CreateUserForm(
                                     newStoreCode = it 
                                     storeDialogError = null
                                 },
-                                label = { Text("Código/ID (ex: LOJA_04)") },
+                                label = { Text("Código/ID", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                placeholder = { Text("Ex: LOJA_04") },
                                 singleLine = true,
+                                maxLines = 1,
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.fillMaxWidth().testTag("input_new_store_code")
                             )
@@ -394,7 +409,9 @@ fun CreateUserForm(
                         value = selectedSectorName,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Setor Vinculado") },
+                        label = { Text("Setor Vinculado", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        singleLine = true,
+                        maxLines = 1,
                         shape = RoundedCornerShape(10.dp),
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedSectorMenu) },
                         modifier = Modifier
