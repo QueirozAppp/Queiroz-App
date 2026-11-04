@@ -49,11 +49,18 @@ fun CameraScanner(
                 val mediaImage = imageProxy.image
                 if (mediaImage != null) {
                     val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+                    android.util.Log.d("CameraScanner", "Processing image...")
                     barcodeScanner.process(inputImage)
                         .addOnSuccessListener { barcodes ->
+                            if (barcodes.isNotEmpty()) {
+                                android.util.Log.d("CameraScanner", "Barcode detected: ${barcodes.first().rawValue}")
+                            }
                             barcodes.firstOrNull()?.rawValue?.let { barcode ->
                                 onBarcodeScanned(barcode)
                             }
+                        }
+                        .addOnFailureListener { e ->
+                            android.util.Log.e("CameraScanner", "Barcode processing failed", e)
                         }
                         .addOnCompleteListener {
                             imageProxy.close()

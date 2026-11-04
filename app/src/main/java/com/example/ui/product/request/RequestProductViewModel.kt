@@ -76,42 +76,78 @@ class RequestProductViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
-            val request = ProductRegistrationRequest(
-                barcode = state.barcodeInput.trim(),
-                name = state.nameInput.trim(),
-                price = parsedPrice,
-                unit = state.selectedUnit,
-                photoBase64 = state.photoBase64,
-                storeId = userProfile.storeId,
-                sectorId = userProfile.sectorId.ifBlank { "GERAL" },
-                requestedByUid = userProfile.uid,
-                requestedByName = userProfile.name.ifBlank { userProfile.email }
-            )
+            val isAuthorizedForDirectCreation = userProfile.role == com.example.core.model.UserRole.ADMIN || 
+                                                userProfile.role == com.example.core.model.UserRole.AVARISTA
 
-            val result = repository.submitRequest(request)
-            result.fold(
-                onSuccess = {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            nameInput = "",
-                            barcodeInput = "",
-                            priceInput = "",
-                            photoBase64 = "",
-                            successMessage = "Solicitação enviada com sucesso! O Avarista ou Administrador irá analisar e aprovar o produto.",
-                            activeTab = 1 // Switch to My Requests tab to see status
-                        )
+            if (isAuthorizedForDirectCreation) {
+                val productRepository = com.example.core.data.ProductRepository()
+                val result = productRepository.createProduct(
+                    barcode = state.barcodeInput.trim(),
+                    name = state.nameInput.trim(),
+                    price = parsedPrice,
+                    unit = state.selectedUnit
+                )
+                result.fold(
+                    onSuccess = {
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                nameInput = "",
+                                barcodeInput = "",
+                                priceInput = "",
+                                photoBase64 = "",
+                                successMessage = "Produto cadastrado diretamente com sucesso!",
+                                activeTab = 1
+                            )
+                        }
+                    },
+                    onFailure = { err ->
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                errorMessage = err.localizedMessage ?: "Erro ao cadastrar produto diretamente."
+                            )
+                        }
                     }
-                },
-                onFailure = { err ->
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            errorMessage = err.localizedMessage ?: "Erro ao submeter solicitação de produto."
-                        )
+                )
+            } else {
+                val request = ProductRegistrationRequest(
+                    barcode = state.barcodeInput.trim(),
+                    name = state.nameInput.trim(),
+                    price = parsedPrice,
+                    unit = state.selectedUnit,
+                    photoBase64 = state.photoBase64,
+                    storeId = userProfile.storeId,
+                    sectorId = userProfile.sectorId.ifBlank { "GERAL" },
+                    requestedByUid = userProfile.uid,
+                    requestedByName = userProfile.name.ifBlank { userProfile.email }
+                )
+
+                val result = repository.submitRequest(request)
+                result.fold(
+                    onSuccess = {
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                nameInput = "",
+                                barcodeInput = "",
+                                priceInput = "",
+                                photoBase64 = "",
+                                successMessage = "Solicitação enviada com sucesso! O Avarista ou Administrador irá analisar e aprovar o produto.",
+                                activeTab = 1
+                            )
+                        }
+                    },
+                    onFailure = { err ->
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                errorMessage = err.localizedMessage ?: "Erro ao submeter solicitação de produto."
+                            )
+                        }
                     }
-                }
-            )
+                )
+            }
         }
     }
 }

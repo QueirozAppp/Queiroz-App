@@ -512,7 +512,7 @@ fun AppEmptyState(
             AppOutlinedButton(
                 text = actionButtonText,
                 onClick = onActionClick,
-                modifier = Modifier.fillMaxWidth(0.7f)
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }
