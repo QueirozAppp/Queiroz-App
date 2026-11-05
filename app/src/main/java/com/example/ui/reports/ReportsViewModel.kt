@@ -55,7 +55,7 @@ class ReportsViewModel(
 
             val periodStartTimestamp = calculatePeriodStartTimestamp(_uiState.value.selectedPeriod)
             val storeFilter = when (userProfile.role) {
-                UserRole.ADMIN -> _uiState.value.selectedStoreId.takeIf { it != "ALL" }
+                UserRole.ADMIN, UserRole.AVARISTA -> _uiState.value.selectedStoreId.takeIf { it != "ALL" }
                 else -> userProfile.storeId
             }
             val sectorFilter = _uiState.value.selectedSectorId.takeIf { it != "ALL" }

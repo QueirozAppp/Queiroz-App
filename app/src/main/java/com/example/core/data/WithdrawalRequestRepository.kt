@@ -622,13 +622,10 @@ class WithdrawalRequestRepository(
             var query: com.google.firebase.firestore.Query = db.collection("withdrawalRequests")
 
             when (userProfile.role) {
-                UserRole.ADMIN -> {
+                UserRole.ADMIN, UserRole.AVARISTA -> {
                     if (!filterStoreId.isNullOrBlank() && filterStoreId != "ALL") {
                         query = query.whereEqualTo("storeId", filterStoreId)
                     }
-                }
-                UserRole.AVARISTA -> {
-                    query = query.whereEqualTo("storeId", userProfile.storeId)
                 }
                 UserRole.SETOR_LEADER -> {
                     query = query.whereEqualTo("requestedBy", userProfile.uid)
@@ -708,13 +705,10 @@ class WithdrawalRequestRepository(
             var query: com.google.firebase.firestore.Query = db.collection("withdrawalRequests")
 
             when (userProfile.role) {
-                UserRole.ADMIN -> {
+                UserRole.ADMIN, UserRole.AVARISTA -> {
                     if (!filterStoreId.isNullOrBlank() && filterStoreId != "ALL") {
                         query = query.whereEqualTo("storeId", filterStoreId)
                     }
-                }
-                UserRole.AVARISTA -> {
-                    query = query.whereEqualTo("storeId", userProfile.storeId)
                 }
                 UserRole.SETOR_LEADER -> {
                     query = query.whereEqualTo("requestedBy", userProfile.uid)
@@ -764,6 +758,79 @@ class WithdrawalRequestRepository(
                     divergenceCount = divergence
                 )
             )
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Retifica uma solicitação de baixa já finalizada (COMPLETED ou DIVERGENCE).
+     */
+    suspend fun rectifyRequest(
+        requestId: String,
+        rectificationReason: String,
+        correctedItems: List<WithdrawalRequestItem>,
+        userProfile: UserProfile
+    ): Result<Unit> {
+        val db = firestore ?: return Result.failure(IllegalStateException("Firestore não inicializado."))
+        
+        if (userProfile.role != UserRole.AVARISTA && userProfile.role != UserRole.ADMIN) {
+             return Result.failure(IllegalStateException("Apenas Avaristas e Administradores podem retificar baixas."))
+        }
+
+        val trimmedReason = rectificationReason.trim()
+        if (trimmedReason.isBlank()) {
+            return Result.failure(IllegalArgumentException("O motivo da retificação é obrigatório."))
+        }
+
+        return try {
+            val docRef = db.collection("withdrawalRequests").document(requestId)
+            val now = System.currentTimeMillis()
+
+            db.runTransaction { transaction ->
+                val snapshot = transaction.get(docRef)
+                if (snapshot.getString("status") !in listOf("COMPLETED", "DIVERGENCE")) {
+                    throw IllegalStateException("Apenas solicitações finalizadas podem ser retificadas.")
+                }
+
+                val itemsData = correctedItems.map { item ->
+                     mapOf(
+                        "productId" to item.productId,
+                        "barcode" to item.barcode,
+                        "productName" to item.productName,
+                        "unit" to item.unit,
+                        "requestedQuantity" to item.requestedQuantity,
+                        "checkedQuantity" to (item.checkedQuantity ?: item.requestedQuantity)
+                    )
+                }
+
+                transaction.update(
+                    docRef,
+                    mapOf(
+                        "status" to "RECTIFIED",
+                        "divergenceReason" to trimmedReason,
+                        "items" to itemsData,
+                        "updatedAt" to now,
+                        "rectifiedBy" to userProfile.uid,
+                        "rectifiedByName" to userProfile.name.ifEmpty { userProfile.email }
+                    )
+                )
+            }.await()
+            
+            auditRepository.logEvent(
+                action = AuditAction.WITHDRAWAL_RECTIFIED,
+                entityType = AuditEntityType.WITHDRAWAL_REQUEST,
+                entityId = requestId,
+                userId = userProfile.uid,
+                userName = userProfile.name.ifEmpty { userProfile.email },
+                userRole = userProfile.role.name,
+                storeId = userProfile.storeId,
+                sectorId = userProfile.sectorId,
+                description = "Solicitação retificada. Motivo: $trimmedReason",
+                metadata = mapOf("rectificationReason" to trimmedReason)
+            )
+
+            Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }

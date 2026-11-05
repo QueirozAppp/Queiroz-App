@@ -261,6 +261,44 @@ class ConferenceViewModel(
         }
     }
 
+    fun rectifyRequest(reason: String, userProfile: UserProfile, onSuccess: () -> Unit) {
+        val req = _uiState.value.currentRequest ?: run {
+            _uiState.update { it.copy(errorMessage = "Nenhuma solicitação selecionada.") }
+            return
+        }
+        val trimmedReason = reason.trim()
+        if (trimmedReason.isBlank()) {
+            _uiState.update { it.copy(errorMessage = "Informe o motivo da retificação.") }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            val result = repository.rectifyRequest(req.id, trimmedReason, _uiState.value.items, userProfile)
+            result.fold(
+                onSuccess = {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            isFinalized = true,
+                            finalStatus = "RECTIFIED",
+                            successMessage = "Solicitação retificada com sucesso!"
+                        )
+                    }
+                    onSuccess()
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = err.localizedMessage ?: "Erro ao retificar solicitação."
+                        )
+                    }
+                }
+            )
+        }
+    }
+
     fun clearMessages() {
         _uiState.update { it.copy(errorMessage = null, successMessage = null) }
     }

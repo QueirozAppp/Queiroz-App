@@ -62,7 +62,7 @@ class OperationalCenterViewModel(
             val periodStartTimestamp = calculatePeriodStartTimestamp(_uiState.value.selectedPeriodFilter)
 
             val filterStore = when (userProfile.role) {
-                UserRole.ADMIN -> _uiState.value.selectedStoreFilter.takeIf { it != "ALL" }
+                UserRole.ADMIN, UserRole.AVARISTA -> _uiState.value.selectedStoreFilter.takeIf { it != "ALL" }
                 else -> userProfile.storeId
             }
 

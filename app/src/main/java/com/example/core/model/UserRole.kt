@@ -10,7 +10,7 @@ package com.example.core.model
  */
 enum class UserRole(val label: String, val description: String) {
     ADMIN(
-        label = "Administrador da Rede",
+        label = "Admin",
         description = "Diretoria e gestão global da rede de supermercados"
     ),
     AVARISTA(

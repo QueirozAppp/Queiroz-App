@@ -68,7 +68,7 @@ class AuditRepository {
             }
             Result.success(auditId)
         } catch (e: Exception) {
-            android.util.Log.w("AuditRepository", "Aviso ao registrar log de auditoria: ${e.message}")
+            android.util.Log.e("AuditRepository", "FALHA CRÍTICA ao registrar log de auditoria: ${e.message}", e)
             Result.failure(e)
         }
     }
