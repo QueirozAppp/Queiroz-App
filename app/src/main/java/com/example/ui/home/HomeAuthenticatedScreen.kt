@@ -789,7 +789,7 @@ private fun RoleBadge(role: UserRole) {
         color = bgColor
     ) {
         Text(
-            text = if (role == UserRole.ADMIN) "Admin da Rede" else role.label,
+            text = if (role == UserRole.ADMIN) "Admin" else role.label,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,

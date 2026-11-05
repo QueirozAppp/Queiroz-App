@@ -40,6 +40,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -247,7 +248,12 @@ fun ScannerScreen(
                         icon = Icons.Default.Error,
                         subtitle = "O código informado não corresponde a nenhum item cadastrado.",
                         actionButtonText = "Tentar Novamente",
-                        onAction = viewModel::tryAgain
+                        onAction = viewModel::tryAgain,
+                        secondaryActionButtonText = if (onProductSelected != null) "Cadastrar novo produto" else null,
+                        onSecondaryAction = {
+                            // Passar o barcode para o caller, simulando um produto vazio
+                            onProductSelected?.invoke(Product(barcode = uiState.scannedBarcode ?: ""))
+                        }
                     )
                 } else if (!uiState.errorMessage.isNullOrEmpty()) {
                     ResultCard(
@@ -351,7 +357,9 @@ private fun ResultCard(
     product: Product? = null,
     subtitle: String? = null,
     actionButtonText: String = "Tentar Novamente",
-    onAction: () -> Unit
+    onAction: () -> Unit,
+    secondaryActionButtonText: String? = null,
+    onSecondaryAction: (() -> Unit)? = null
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
@@ -427,6 +435,19 @@ private fun ResultCard(
                     .testTag("btn_scanner_action")
             ) {
                 Text(actionButtonText, fontWeight = FontWeight.Bold)
+            }
+            
+            if (secondaryActionButtonText != null && onSecondaryAction != null) {
+                OutlinedButton(
+                    onClick = onSecondaryAction,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .testTag("btn_scanner_secondary_action")
+                ) {
+                    Text(secondaryActionButtonText, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
