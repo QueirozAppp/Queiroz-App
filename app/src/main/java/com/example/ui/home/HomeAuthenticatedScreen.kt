@@ -68,6 +68,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.core.model.UserProfile
 import com.example.core.model.UserRole
@@ -220,7 +221,10 @@ fun HomeAuthenticatedScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                modifier = Modifier.weight(1f, fill = false),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Box(
                                     modifier = Modifier
                                         .size(48.dp)
@@ -236,20 +240,25 @@ fun HomeAuthenticatedScreen(
                                     )
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
-                                Column {
+                                Column(modifier = Modifier.weight(1f, fill = false)) {
                                     Text(
                                         text = "Olá, ${userProfile.name.ifEmpty { "Usuário Operacional" }}",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
-                                        color = AppColors.TextPrimary
+                                        color = AppColors.TextPrimary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
                                         text = userProfile.email,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = AppColors.TextSecondary
+                                        color = AppColors.TextSecondary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
+                            Spacer(modifier = Modifier.width(8.dp))
                             RoleBadge(role = userProfile.role)
                         }
 
@@ -276,7 +285,9 @@ fun HomeAuthenticatedScreen(
                                     text = "Loja: ${userProfile.storeId}  •  Setor: ${userProfile.sectorId.ifEmpty { "Geral" }}",
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = AppColors.TextPrimary
+                                    color = AppColors.TextPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -400,28 +411,6 @@ fun HomeAuthenticatedScreen(
                         )
                     }
 
-                    if (onOpenMyRequests != null) {
-                        ActionCardButton(
-                            title = "Minhas Solicitações",
-                            subtitle = "Ver fila de requisições enviadas para avaria",
-                            icon = Icons.Default.FactCheck,
-                            iconColor = AppColors.Secondary,
-                            onClick = onOpenMyRequests,
-                            modifier = Modifier.testTag("btn_open_my_requests")
-                        )
-                    }
-
-                    if (onOpenScanner != null) {
-                        ActionCardButton(
-                            title = "Escanear Código de Barras",
-                            subtitle = "Leitura rápida via câmera para identificação de item",
-                            icon = Icons.Default.CameraAlt,
-                            iconColor = Color(0xFF0284C7),
-                            onClick = onOpenScanner,
-                            modifier = Modifier.testTag("btn_open_scanner")
-                        )
-                    }
-
                     if (onOpenRequestProduct != null) {
                         ActionCardButton(
                             title = "Solicitar Cadastro de Produto",
@@ -452,17 +441,6 @@ fun HomeAuthenticatedScreen(
                             iconColor = AppColors.Primary,
                             onClick = onOpenReports,
                             modifier = Modifier.testTag("btn_open_reports_leader")
-                        )
-                    }
-
-                    if (onOpenHistory != null) {
-                        ActionCardButton(
-                            title = historyButtonLabel,
-                            subtitle = "Registros finalizados e conferidos (somente leitura)",
-                            icon = Icons.Default.History,
-                            iconColor = AppColors.TextSecondary,
-                            onClick = onOpenHistory,
-                            modifier = Modifier.testTag("btn_open_history")
                         )
                     }
                 }
@@ -541,17 +519,6 @@ fun HomeAuthenticatedScreen(
                         )
                     }
 
-                    if (onOpenScanner != null) {
-                        ActionCardButton(
-                            title = "Escanear Código de Barras",
-                            subtitle = "Leitura e busca de produto para conferência",
-                            icon = Icons.Default.CameraAlt,
-                            iconColor = AppColors.Secondary,
-                            onClick = onOpenScanner,
-                            modifier = Modifier.testTag("btn_open_scanner")
-                        )
-                    }
-
                     if (onOpenProductApproval != null) {
                         ActionCardButton(
                             title = "Aprovar Cadastros de Produtos",
@@ -571,17 +538,6 @@ fun HomeAuthenticatedScreen(
                             iconColor = Color(0xFFD97706),
                             onClick = onOpenProducts,
                             modifier = Modifier.testTag("btn_open_products")
-                        )
-                    }
-
-                    if (onOpenHistory != null) {
-                        ActionCardButton(
-                            title = historyButtonLabel,
-                            subtitle = "Baixas finalizadas na unidade",
-                            icon = Icons.Default.History,
-                            iconColor = AppColors.TextSecondary,
-                            onClick = onOpenHistory,
-                            modifier = Modifier.testTag("btn_open_history")
                         )
                     }
                 }
@@ -658,28 +614,6 @@ fun HomeAuthenticatedScreen(
                             iconColor = Color(0xFFD97706),
                             onClick = onOpenProducts,
                             modifier = Modifier.testTag("btn_open_products")
-                        )
-                    }
-
-                    if (onOpenConferences != null) {
-                        ActionCardButton(
-                            title = "Fila de Conferências da Rede",
-                            subtitle = "Acompanhar todas as conferências em andamento",
-                            icon = Icons.Default.FactCheck,
-                            iconColor = Color(0xFF16A34A),
-                            onClick = onOpenConferences,
-                            modifier = Modifier.testTag("btn_open_conferences")
-                        )
-                    }
-
-                    if (onOpenHistory != null) {
-                        ActionCardButton(
-                            title = historyButtonLabel,
-                            subtitle = "Histórico completo com filtros avançados",
-                            icon = Icons.Default.History,
-                            iconColor = AppColors.TextSecondary,
-                            onClick = onOpenHistory,
-                            modifier = Modifier.testTag("btn_open_history")
                         )
                     }
 
@@ -763,13 +697,17 @@ private fun ActionCardButton(
                     text = title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = AppColors.TextPrimary
+                    color = AppColors.TextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = AppColors.TextSecondary
+                    color = AppColors.TextSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }

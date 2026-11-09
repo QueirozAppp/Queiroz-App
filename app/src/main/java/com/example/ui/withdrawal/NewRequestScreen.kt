@@ -56,6 +56,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.core.model.Product
@@ -139,12 +140,16 @@ fun NewRequestScreen(
                             text = if (uiState.isReviewing) "Revisão da Solicitação" else "Nova Baixa de Avaria",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = AppColors.TextPrimary
+                            color = AppColors.TextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "${userProfile.sectorId.ifEmpty { "Geral" }} • Loja ${userProfile.storeId}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = AppColors.TextTertiary
+                            color = AppColors.TextTertiary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 },

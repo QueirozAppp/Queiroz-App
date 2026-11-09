@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -298,7 +299,10 @@ fun AppMetricCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = if (isSelected) color else AppColors.TextSecondary,
                     fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 0.8.sp
+                    letterSpacing = 0.8.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
                 Box(
                     modifier = Modifier
@@ -319,14 +323,18 @@ fun AppMetricCard(
                 text = value,
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Black,
-                color = if (isSelected) color else AppColors.TextPrimary
+                color = if (isSelected) color else AppColors.TextPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             if (subtitle != null) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = AppColors.TextTertiary
+                    color = AppColors.TextTertiary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }

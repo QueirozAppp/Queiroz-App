@@ -30,13 +30,6 @@ class ProductRepository(
             return@callbackFlow
         }
 
-        val auth = FirebaseProvider.getAuthOrNull()
-        if (auth?.currentUser == null) {
-            android.util.Log.w("ProductRepository", "Usuário não autenticado, não carregando produtos.")
-            trySend(emptyList())
-            close()
-            return@callbackFlow
-        }
 
         val listener = db.collection("products")
             .addSnapshotListener { snapshot, error ->

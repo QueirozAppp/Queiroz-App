@@ -398,28 +398,28 @@ fun ConferenceDetailScreen(
                                 )
                             }
                         }
+                    }
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                        OutlinedButton(
-                            onClick = { showCancelDialog = true },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.StatusDivergenceText),
-                            border = BorderStroke(1.dp, AppColors.StatusDivergence),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                                .testTag("btn_cancel_conference_request")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                                tint = AppColors.StatusDivergenceText
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Excluir / Cancelar Solicitação", fontWeight = FontWeight.Bold)
-                        }
+                    OutlinedButton(
+                        onClick = { showCancelDialog = true },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.StatusDivergenceText),
+                        border = BorderStroke(1.dp, AppColors.StatusDivergence),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("btn_cancel_conference_request")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = AppColors.StatusDivergenceText
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Excluir / Cancelar Solicitação", fontWeight = FontWeight.Bold)
                     }
                 } else {
                     OutlinedButton(
