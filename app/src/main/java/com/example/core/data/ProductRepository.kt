@@ -85,16 +85,16 @@ class ProductRepository(
     /**
      * Retorna a lista completa de produtos do catálogo global de forma direta via consulta única.
      */
-    suspend fun getAllProducts(): List<Product> {
-        val db = firestore ?: return emptyList()
+    suspend fun getAllProducts(): Result<List<Product>> {
+        val db = firestore ?: return Result.failure(IllegalStateException("Firestore não inicializado."))
         return try {
             val querySnapshot = db.collection("products").get().await()
             val list = querySnapshot.documents.mapNotNull { doc -> parseProduct(doc) }
             android.util.Log.d("ProductRepository", "getAllProducts() retornou ${list.size} produtos.")
-            list
+            Result.success(list)
         } catch (e: Exception) {
             android.util.Log.e("ProductRepository", "Erro ao buscar todos os produtos: ${e.message}")
-            emptyList()
+            Result.failure(e)
         }
     }
 

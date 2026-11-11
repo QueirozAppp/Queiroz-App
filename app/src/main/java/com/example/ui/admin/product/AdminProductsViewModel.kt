@@ -29,13 +29,23 @@ class AdminProductsViewModel(
 
     fun refreshProducts() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-            val directList = productRepository.getAllProducts()
-            if (directList.isNotEmpty() || allProducts.isEmpty()) {
-                allProducts = directList
-                filterProducts(directList, _uiState.value.searchQuery)
-            }
-            _uiState.update { it.copy(isLoading = false) }
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            val directResult = productRepository.getAllProducts()
+            directResult.fold(
+                onSuccess = { directList ->
+                    allProducts = directList
+                    filterProducts(directList, _uiState.value.searchQuery)
+                    _uiState.update { it.copy(isLoading = false) }
+                },
+                onFailure = { error ->
+                    val msg = if (error.message?.contains("PERMISSION_DENIED", ignoreCase = true) == true) {
+                        "Permissão negada no Firestore: As regras do banco precisam de leitura liberada para 'products'. Veja as instruções no painel de suporte."
+                    } else {
+                        "Erro ao carregar produtos: ${error.localizedMessage}"
+                    }
+                    _uiState.update { it.copy(isLoading = false, errorMessage = msg) }
+                }
+            )
         }
     }
 
