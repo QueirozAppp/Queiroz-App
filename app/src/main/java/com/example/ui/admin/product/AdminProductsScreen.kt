@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -117,6 +118,16 @@ fun AdminProductsScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { viewModel.refreshProducts() },
+                        modifier = Modifier.testTag("btn_refresh_products")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Atualizar Catálogo",
+                            tint = AppColors.Primary
+                        )
+                    }
                     if (onOpenApprovals != null) {
                         IconButton(
                             onClick = onOpenApprovals,
@@ -240,7 +251,26 @@ fun AdminProductsScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                if (uiState.products.isEmpty()) {
+                if (uiState.isLoading && uiState.products.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            CircularProgressIndicator(color = AppColors.Primary)
+                            Text(
+                                text = "Carregando catálogo de produtos...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = AppColors.TextSecondary
+                            )
+                        }
+                    }
+                } else if (uiState.products.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()

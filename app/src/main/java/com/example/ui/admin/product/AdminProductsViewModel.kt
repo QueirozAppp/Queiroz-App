@@ -17,20 +17,35 @@ class AdminProductsViewModel(
     private val productRepository: ProductRepository = ProductRepository()
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(AdminProductsUiState())
+    private val _uiState = MutableStateFlow(AdminProductsUiState(isLoading = true))
     val uiState: StateFlow<AdminProductsUiState> = _uiState.asStateFlow()
 
     private var allProducts: List<Product> = emptyList()
 
     init {
         observeProducts()
+        refreshProducts()
+    }
+
+    fun refreshProducts() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val directList = productRepository.getAllProducts()
+            if (directList.isNotEmpty() || allProducts.isEmpty()) {
+                allProducts = directList
+                filterProducts(directList, _uiState.value.searchQuery)
+            }
+            _uiState.update { it.copy(isLoading = false) }
+        }
     }
 
     private fun observeProducts() {
         viewModelScope.launch {
             productRepository.productsFlow.collect { list ->
+                android.util.Log.d("AdminProductsViewModel", "Recebidos ${list.size} produtos via flow")
                 allProducts = list
                 filterProducts(list, _uiState.value.searchQuery)
+                _uiState.update { it.copy(isLoading = false) }
             }
         }
     }
@@ -104,7 +119,20 @@ class AdminProductsViewModel(
                 unit = state.newUnit
             )
             result.fold(
-                onSuccess = {
+                onSuccess = { createdId ->
+                    val now = System.currentTimeMillis()
+                    val immediateProduct = Product(
+                        id = createdId,
+                        barcode = state.newBarcode.trim(),
+                        name = state.newName.trim(),
+                        price = parsedPrice,
+                        unit = state.newUnit,
+                        active = true,
+                        createdAt = now,
+                        updatedAt = now
+                    )
+                    allProducts = (listOf(immediateProduct) + allProducts).distinctBy { it.id }
+                    filterProducts(allProducts, _uiState.value.searchQuery)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -112,6 +140,7 @@ class AdminProductsViewModel(
                             successMessage = "Produto cadastrado no Catálogo Global com sucesso!"
                         )
                     }
+                    refreshProducts()
                 },
                 onFailure = { err ->
                     _uiState.update {

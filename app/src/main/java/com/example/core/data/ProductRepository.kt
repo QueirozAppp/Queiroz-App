@@ -20,6 +20,85 @@ class ProductRepository(
     private val firestore get() = FirebaseProvider.getFirestoreOrNull()
 
     /**
+     * Converte um DocumentSnapshot do Firestore em Product de forma ultra-segura,
+     * tratando compatibilidade de tipos numéricos (Long/Double/Int) e Timestamps.
+     */
+    fun parseProduct(doc: com.google.firebase.firestore.DocumentSnapshot): Product? {
+        return try {
+            val direct = doc.toObject(Product::class.java)?.copy(id = doc.id)
+            if (direct != null && direct.name.isNotBlank()) {
+                return direct
+            }
+            val data = doc.data ?: return null
+            val id = doc.id
+            val barcode = (data["barcode"] as? String) ?: (data["barcode"]?.toString() ?: "")
+            val name = (data["name"] as? String) ?: (data["name"]?.toString() ?: "")
+            val price = when (val p = data["price"]) {
+                is Number -> p.toDouble()
+                is String -> p.toDoubleOrNull() ?: 0.0
+                else -> 0.0
+            }
+            val unit = (data["unit"] as? String) ?: "UN"
+            val active = when (val a = data["active"]) {
+                is Boolean -> a
+                is String -> a.toBooleanStrictOrNull() ?: true
+                else -> true
+            }
+            val createdAt = when (val c = data["createdAt"]) {
+                is Number -> c.toLong()
+                is com.google.firebase.Timestamp -> c.toDate().time
+                else -> 0L
+            }
+            val updatedAt = when (val u = data["updatedAt"]) {
+                is Number -> u.toLong()
+                is com.google.firebase.Timestamp -> u.toDate().time
+                else -> 0L
+            }
+            Product(
+                id = id,
+                barcode = barcode,
+                name = name,
+                price = price,
+                unit = unit,
+                active = active,
+                createdAt = createdAt,
+                updatedAt = updatedAt
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("ProductRepository", "Erro ao deserializar produto ${doc.id}: ${e.message}")
+            try {
+                val data = doc.data ?: return null
+                Product(
+                    id = doc.id,
+                    barcode = data["barcode"]?.toString() ?: "",
+                    name = data["name"]?.toString() ?: "Item sem nome",
+                    price = (data["price"]?.toString()?.toDoubleOrNull()) ?: 0.0,
+                    unit = data["unit"]?.toString() ?: "UN",
+                    active = true
+                )
+            } catch (ex: Exception) {
+                null
+            }
+        }
+    }
+
+    /**
+     * Retorna a lista completa de produtos do catálogo global de forma direta via consulta única.
+     */
+    suspend fun getAllProducts(): List<Product> {
+        val db = firestore ?: return emptyList()
+        return try {
+            val querySnapshot = db.collection("products").get().await()
+            val list = querySnapshot.documents.mapNotNull { doc -> parseProduct(doc) }
+            android.util.Log.d("ProductRepository", "getAllProducts() retornou ${list.size} produtos.")
+            list
+        } catch (e: Exception) {
+            android.util.Log.e("ProductRepository", "Erro ao buscar todos os produtos: ${e.message}")
+            emptyList()
+        }
+    }
+
+    /**
      * Retorna um fluxo em tempo real com todos os produtos do Catálogo Global (`products`).
      */
     val productsFlow: Flow<List<Product>> = callbackFlow {
@@ -30,21 +109,17 @@ class ProductRepository(
             return@callbackFlow
         }
 
-
         val listener = db.collection("products")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    android.util.Log.e("ProductRepository", "Erro ao carregar produtos: ${error.message}")
-                    trySend(emptyList())
+                    android.util.Log.e("ProductRepository", "Erro ao carregar produtos em tempo real: ${error.message}")
                     return@addSnapshotListener
                 }
-                
+
                 val docs = snapshot?.documents ?: emptyList()
-                android.util.Log.d("ProductRepository", "Produtos carregados: ${docs.size}")
-                
-                val list = docs.mapNotNull { doc ->
-                    doc.toObject(Product::class.java)?.copy(id = doc.id)
-                }
+                android.util.Log.d("ProductRepository", "Produtos recebidos via snapshot: ${docs.size}")
+
+                val list = docs.mapNotNull { doc -> parseProduct(doc) }
                 trySend(list)
             }
 
@@ -68,7 +143,7 @@ class ProductRepository(
                 .await()
 
             val doc = querySnapshot.documents.firstOrNull()
-            val product = doc?.toObject(Product::class.java)?.copy(id = doc.id)
+            val product = doc?.let { parseProduct(it) }
             Result.success(product)
         } catch (e: Exception) {
             Result.failure(e)
