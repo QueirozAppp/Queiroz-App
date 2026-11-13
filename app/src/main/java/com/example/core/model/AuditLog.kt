@@ -58,6 +58,7 @@ object AuditAction {
     const val PRODUCT_UPDATED = "PRODUCT_UPDATED"
     const val PRODUCT_ACTIVATED = "PRODUCT_ACTIVATED"
     const val PRODUCT_DEACTIVATED = "PRODUCT_DEACTIVATED"
+    const val PRODUCT_DELETED = "PRODUCT_DELETED"
 
     // Solicitações de Cadastro de Produto
     const val PRODUCT_REQUEST_CREATED = "PRODUCT_REQUEST_CREATED"

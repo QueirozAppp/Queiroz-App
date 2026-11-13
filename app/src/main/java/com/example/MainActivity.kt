@@ -179,11 +179,17 @@ class MainActivity : ComponentActivity() {
                     }
                     currentScreen == "products" -> {
                         val profile = (uiState.authState as AuthState.Authenticated).userProfile
+                        androidx.compose.runtime.LaunchedEffect(profile) {
+                            adminProductsViewModel.setUserProfile(profile)
+                            adminProductsViewModel.refreshProducts()
+                        }
                         AdminProductsScreen(
                             viewModel = adminProductsViewModel,
                             onBackToHome = { currentScreen = "home" },
+                            userProfile = profile,
                             isAdmin = profile.role == UserRole.ADMIN,
                             onOpenScanner = {
+                                scannerViewModel.tryAgain()
                                 scannerSourceScreen = "products"
                                 currentScreen = "scanner"
                             },
@@ -198,6 +204,7 @@ class MainActivity : ComponentActivity() {
                             viewModel = requestProductViewModel,
                             userProfile = profile,
                             onOpenScanner = {
+                                scannerViewModel.tryAgain()
                                 scannerSourceScreen = "request_product"
                                 currentScreen = "scanner"
                             },
@@ -237,6 +244,7 @@ class MainActivity : ComponentActivity() {
                             viewModel = newRequestViewModel,
                             userProfile = profile,
                             onOpenScanner = {
+                                scannerViewModel.tryAgain()
                                 scannerSourceScreen = "new_request"
                                 currentScreen = "scanner"
                             },
@@ -264,15 +272,21 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     currentScreen == "scanner" -> {
+                        val isRegSource = scannerSourceScreen == "products" || scannerSourceScreen == "request_product"
                         ScannerScreen(
                             viewModel = scannerViewModel,
                             onBackToHome = { currentScreen = scannerSourceScreen },
+                            isForProductRegistration = isRegSource,
                             onProductSelected = { product ->
                                 when (scannerSourceScreen) {
                                     "products" -> {
-                                        adminProductsViewModel.startCreatingProduct()
+                                        if (!adminProductsViewModel.uiState.value.isCreatingProduct) {
+                                            adminProductsViewModel.startCreatingProduct()
+                                        }
                                         adminProductsViewModel.onNewBarcodeChanged(product.barcode)
-                                        adminProductsViewModel.onNewNameChanged(product.name)
+                                        if (product.name.isNotBlank()) {
+                                            adminProductsViewModel.onNewNameChanged(product.name)
+                                        }
                                         currentScreen = "products"
                                     }
                                     "request_product" -> {

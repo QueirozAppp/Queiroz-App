@@ -17,6 +17,15 @@ service cloud.firestore {
       );
     }
 
+    function isAdminOrAvarista() {
+      return isAdmin() || (
+        isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'AVARISTA' &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.active == true
+      );
+    }
+
     function isSystemActive() {
       return isAuthenticated() && (
         request.auth.token.email == 'aplicativoqueirozapp@gmail.com' ||
@@ -48,9 +57,9 @@ service cloud.firestore {
 
     // Regras da coleção de Produtos (Catalog - Global para toda a rede e todas as lojas)
     match /products/{productId} {
-      allow read: if true;
-      allow create, update: if isAuthenticated();
-      allow delete: if isAdmin();
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdminOrAvarista();
     }
 
     // Regras de Solicitações de Baixa (Withdrawal Requests)
@@ -64,7 +73,8 @@ service cloud.firestore {
 
     // Regras de Solicitações de Cadastro de Produtos (Product Registration Requests)
     match /productRegistrationRequests/{reqId} {
-      allow read, write: if isAuthenticated();
+      allow read, create, update: if isAuthenticated();
+      allow delete: if isAdminOrAvarista();
     }
 
     // Regras de Logs de Auditoria (AuditLogs - Imutáveis)

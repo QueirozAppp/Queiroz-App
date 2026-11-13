@@ -1,9 +1,20 @@
 package com.example.ui.admin.product
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.util.Base64
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
-
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,15 +28,21 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.PlaylistAddCheck
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -52,36 +69,44 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.core.model.Product
 import com.example.core.model.ProductUnit
+import com.example.core.model.UserProfile
+import com.example.core.model.UserRole
+import com.example.core.util.ImageCompressionUtils
 import com.example.ui.components.AppColors
 import com.example.ui.components.AppEmptyState
-import com.example.ui.components.AppErrorBanner
 import com.example.ui.components.AppSectionHeader
 
-import androidx.compose.material.icons.filled.PlaylistAddCheck
-
 /**
- * Tela de Gestão e Cadastro de Produtos no Catálogo Global da Rede redesenhada (Etapa 20).
- * Interface limpa com busca instantânea, badges de unidade/status e preservação de testTags.
+ * Tela de Gestão e Catálogo Geral de Produtos.
+ * Oferece busca instantânea, cadastro rápido com foto e menu de detalhes do produto ao clicar.
+ * Edição e exclusão são restritas para Administradores e Avaristas.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminProductsScreen(
     viewModel: AdminProductsViewModel,
     onBackToHome: () -> Unit,
+    userProfile: UserProfile? = null,
     isAdmin: Boolean = true,
     onOpenScanner: (() -> Unit)? = null,
     onOpenApprovals: (() -> Unit)? = null,
@@ -89,8 +114,23 @@ fun AdminProductsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    LaunchedEffect(userProfile) {
+        if (userProfile != null) {
+            viewModel.setUserProfile(userProfile)
+        }
+    }
+
+    val effectiveProfile = userProfile ?: uiState.userProfile
+    val canEditOrDelete = isAdmin || (effectiveProfile?.role == UserRole.AVARISTA)
+
     BackHandler(enabled = true) {
-        onBackToHome()
+        if (uiState.selectedProduct != null) {
+            viewModel.dismissProductDetail()
+        } else if (uiState.isCreatingProduct) {
+            viewModel.cancelCreatingProduct()
+        } else {
+            onBackToHome()
+        }
     }
 
     Scaffold(
@@ -102,7 +142,7 @@ fun AdminProductsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = if (isAdmin) "Catálogo Geral de Produtos" else "Consulta de Produtos",
+                        text = if (canEditOrDelete) "Catálogo Geral de Produtos" else "Consulta de Produtos",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = AppColors.TextPrimary
@@ -128,7 +168,7 @@ fun AdminProductsScreen(
                             tint = AppColors.Primary
                         )
                     }
-                    if (onOpenApprovals != null) {
+                    if (onOpenApprovals != null && canEditOrDelete) {
                         IconButton(
                             onClick = onOpenApprovals,
                             modifier = Modifier.testTag("btn_top_product_approvals")
@@ -147,7 +187,7 @@ fun AdminProductsScreen(
             )
         },
         floatingActionButton = {
-            if (isAdmin && !uiState.isCreatingProduct) {
+            if (canEditOrDelete && !uiState.isCreatingProduct) {
                 FloatingActionButton(
                     onClick = viewModel::startCreatingProduct,
                     containerColor = AppColors.Primary,
@@ -165,7 +205,7 @@ fun AdminProductsScreen(
                 .padding(innerPadding)
                 .padding(16.dp)
         ) {
-            // Success / Error Banners
+            // Banners de Sucesso ou Erro
             if (!uiState.successMessage.isNullOrEmpty()) {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
@@ -176,7 +216,7 @@ fun AdminProductsScreen(
                         .padding(bottom = 12.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(14.dp),
+                        modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp, end = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -190,8 +230,17 @@ fun AdminProductsScreen(
                             text = uiState.successMessage ?: "",
                             color = AppColors.StatusCompletedText,
                             style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f)
                         )
+                        IconButton(onClick = viewModel::clearMessages) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Fechar aviso",
+                                tint = AppColors.StatusCompletedText,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -206,24 +255,37 @@ fun AdminProductsScreen(
                         .padding(bottom = 12.dp)
                         .testTag("product_error_banner")
                 ) {
-                    Text(
-                        text = uiState.errorMessage ?: "",
-                        modifier = Modifier.padding(14.dp),
-                        color = AppColors.StatusDivergenceText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Row(
+                        modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp, end = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = uiState.errorMessage ?: "",
+                            modifier = Modifier.weight(1f),
+                            color = AppColors.StatusDivergenceText,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        IconButton(onClick = viewModel::clearMessages) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Fechar erro",
+                                tint = AppColors.StatusDivergenceText,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
                 }
             }
 
-            if (uiState.isCreatingProduct && isAdmin) {
+            if (uiState.isCreatingProduct && canEditOrDelete) {
                 CreateProductForm(
                     uiState = uiState,
                     viewModel = viewModel,
                     onOpenScanner = onOpenScanner
                 )
             } else {
-                // Search Bar
+                // Barra de Pesquisa Instantânea
                 OutlinedTextField(
                     value = uiState.searchQuery,
                     onValueChange = viewModel::onSearchQueryChanged,
@@ -245,7 +307,7 @@ fun AdminProductsScreen(
 
                 AppSectionHeader(
                     title = "Catálogo de Itens",
-                    subtitle = "Base central de produtos cadastrados na rede de supermercados",
+                    subtitle = "Toque em um item para abrir suas informações completas e foto",
                     badgeText = "${uiState.products.size} produto(s)"
                 )
 
@@ -281,8 +343,8 @@ fun AdminProductsScreen(
                             icon = Icons.Default.Inventory2,
                             title = "Nenhum produto encontrado",
                             message = if (uiState.searchQuery.isNotBlank()) "Nenhum item corresponde à busca." else "Nenhum produto cadastrado no catálogo.",
-                            actionButtonText = if (isAdmin) "Cadastrar Produto" else null,
-                            onActionClick = if (isAdmin) viewModel::startCreatingProduct else null
+                            actionButtonText = if (canEditOrDelete) "Cadastrar Produto" else null,
+                            onActionClick = if (canEditOrDelete) viewModel::startCreatingProduct else null
                         )
                     }
                 } else {
@@ -295,7 +357,8 @@ fun AdminProductsScreen(
                         items(uiState.products, key = { it.id }) { product ->
                             ProductItemCard(
                                 product = product,
-                                isAdmin = isAdmin,
+                                canEditOrDelete = canEditOrDelete,
+                                onClick = { viewModel.selectProduct(product) },
                                 onToggleActive = { viewModel.toggleProductActive(product.id, product.active) }
                             )
                         }
@@ -304,14 +367,50 @@ fun AdminProductsScreen(
             }
         }
     }
+
+    // Modal de Detalhes, Edição e Foto do Produto Selecionado
+    if (uiState.selectedProduct != null) {
+        ProductDetailBottomSheet(
+            product = uiState.selectedProduct!!,
+            uiState = uiState,
+            canEditOrDelete = canEditOrDelete,
+            onDismiss = viewModel::dismissProductDetail,
+            onStartEditing = viewModel::startEditingSelectedProduct,
+            onCancelEditing = viewModel::cancelEditingSelectedProduct,
+            onSaveEdits = viewModel::saveProductEdits,
+            onPromptDelete = viewModel::promptDeleteProduct,
+            onDismissDelete = viewModel::dismissDeleteConfirmation,
+            onConfirmDelete = viewModel::confirmDeleteProduct,
+            onToggleActive = { viewModel.toggleProductActive(uiState.selectedProduct!!.id, uiState.selectedProduct!!.active) },
+            onEditNameChanged = viewModel::onEditNameChanged,
+            onEditBarcodeChanged = viewModel::onEditBarcodeChanged,
+            onEditPriceChanged = viewModel::onEditPriceChanged,
+            onEditUnitChanged = viewModel::onEditUnitChanged,
+            onEditActiveChanged = viewModel::onEditActiveChanged,
+            onEditPhotoCaptured = viewModel::onEditPhotoCaptured,
+            onRemoveEditPhoto = viewModel::onRemoveEditPhoto
+        )
+    }
 }
 
 @Composable
 private fun ProductItemCard(
     product: Product,
-    isAdmin: Boolean,
+    canEditOrDelete: Boolean,
+    onClick: () -> Unit,
     onToggleActive: () -> Unit
 ) {
+    val photoBitmap = remember(product.photoBase64) {
+        if (product.photoBase64.isNotBlank()) {
+            try {
+                val bytes = Base64.decode(product.photoBase64, Base64.DEFAULT)
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+            } catch (_: Exception) {
+                null
+            }
+        } else null
+    }
+
     Card(
         colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
         shape = RoundedCornerShape(14.dp),
@@ -319,6 +418,8 @@ private fun ProductItemCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
             .testTag("product_card_${product.id}")
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -331,20 +432,31 @@ private fun ProductItemCard(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .background(AppColors.PrimaryContainer, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Inventory2,
-                            contentDescription = null,
-                            tint = AppColors.Primary,
-                            modifier = Modifier.size(20.dp)
+                    if (photoBitmap != null) {
+                        Image(
+                            bitmap = photoBitmap,
+                            contentDescription = "Foto do produto",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(46.dp)
+                                .clip(RoundedCornerShape(10.dp))
                         )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(46.dp)
+                                .background(AppColors.PrimaryContainer, RoundedCornerShape(10.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Inventory2,
+                                contentDescription = null,
+                                tint = AppColors.Primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
                             text = product.name,
@@ -353,14 +465,14 @@ private fun ProductItemCard(
                             color = AppColors.TextPrimary
                         )
                         Text(
-                            text = "EAN: ${product.barcode}",
+                            text = if (product.barcode.isNotBlank()) "EAN: ${product.barcode}" else "Sem código EAN",
                             style = MaterialTheme.typography.bodySmall,
                             color = AppColors.TextTertiary
                         )
                     }
                 }
 
-                if (isAdmin) {
+                if (canEditOrDelete) {
                     Switch(
                         checked = product.active,
                         onCheckedChange = { onToggleActive() },
@@ -377,7 +489,8 @@ private fun ProductItemCard(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
                     shape = RoundedCornerShape(6.dp),
@@ -419,6 +532,14 @@ private fun ProductItemCard(
                         color = if (product.active) AppColors.StatusCompletedText else AppColors.StatusDivergenceText
                     )
                 }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                Text(
+                    text = "Toque para ver detalhes",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AppColors.TextTertiary
+                )
             }
         }
     }
@@ -431,23 +552,94 @@ private fun CreateProductForm(
     viewModel: AdminProductsViewModel,
     onOpenScanner: (() -> Unit)? = null
 ) {
+    val context = LocalContext.current
     var expandedUnitMenu by remember { mutableStateOf(false) }
 
     val selectedUnitLabel = uiState.availableUnits.find { it.name == uiState.newUnit }?.label ?: uiState.newUnit
 
-    Card(
-        colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, AppColors.BorderSubtle),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    val photoBitmap = remember(uiState.newPhotoBase64) {
+        if (uiState.newPhotoBase64.isNotBlank()) {
+            try {
+                val bytes = Base64.decode(uiState.newPhotoBase64, Base64.DEFAULT)
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+            } catch (_: Exception) {
+                null
+            }
+        } else null
+    }
+
+    // Launchers de Câmera e Galeria para novo produto
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                val bitmap = ImageCompressionUtils.decodeScaledBitmapFromUri(context, uri)
+                if (bitmap != null) {
+                    val base64 = ImageCompressionUtils.resizeAndCompressBitmap(bitmap)
+                    viewModel.onNewPhotoCaptured(base64)
+                } else {
+                    Toast.makeText(context, "Erro ao decodificar imagem.", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Erro ao carregar imagem: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap: Bitmap? ->
+        if (bitmap != null) {
+            try {
+                val base64 = resizeAndCompressBitmap(bitmap)
+                viewModel.onNewPhotoCaptured(base64)
+            } catch (e: Exception) {
+                Toast.makeText(context, "Erro ao processar foto: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            cameraLauncher.launch(null)
+        } else {
+            Toast.makeText(context, "Permissão da câmera necessária.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun launchCamera() {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+        if (hasPermission) {
+            cameraLauncher.launch(null)
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .testTag("create_product_form")
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
     ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+        Card(
+            colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, AppColors.BorderSubtle),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("create_product_form")
         ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
             Text(
                 text = "Cadastrar Produto na Rede",
                 style = MaterialTheme.typography.titleLarge,
@@ -455,7 +647,96 @@ private fun CreateProductForm(
                 color = AppColors.TextPrimary
             )
 
-            // Barcode (String, preserving leading zeros) with Scanner Button
+            // Seção de Foto
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (photoBitmap != null) {
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    ) {
+                        Image(
+                            bitmap = photoBitmap,
+                            contentDescription = "Foto capturada",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .background(AppColors.SurfaceElevated, RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Inventory2,
+                            contentDescription = null,
+                            tint = AppColors.TextTertiary,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = { launchCamera() },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .testTag("btn_new_product_camera")
+                    ) {
+                        Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Câmera", style = MaterialTheme.typography.labelSmall)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            galleryLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .testTag("btn_new_product_gallery")
+                    ) {
+                        Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Galeria", style = MaterialTheme.typography.labelSmall)
+                    }
+
+                    if (uiState.newPhotoBase64.isNotBlank()) {
+                        IconButton(
+                            onClick = viewModel::onRemoveNewPhoto,
+                            modifier = Modifier
+                                .background(AppColors.StatusDivergenceBg, RoundedCornerShape(10.dp))
+                                .size(48.dp)
+                                .testTag("btn_new_product_remove_photo")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Remover Foto",
+                                tint = AppColors.StatusDivergenceText,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Código de Barras com botão de Scanner
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -488,7 +769,7 @@ private fun CreateProductForm(
                 }
             }
 
-            // Name
+            // Nome
             OutlinedTextField(
                 value = uiState.newName,
                 onValueChange = viewModel::onNewNameChanged,
@@ -500,7 +781,7 @@ private fun CreateProductForm(
                     .testTag("input_new_product_name")
             )
 
-            // Price (Preço)
+            // Preço
             OutlinedTextField(
                 value = uiState.newPrice,
                 onValueChange = viewModel::onNewPriceChanged,
@@ -513,7 +794,7 @@ private fun CreateProductForm(
                     .testTag("input_new_product_price")
             )
 
-            // Unit Dropdown
+            // Unidade Dropdown
             ExposedDropdownMenuBox(
                 expanded = expandedUnitMenu,
                 onExpandedChange = { expandedUnitMenu = it },
@@ -561,6 +842,7 @@ private fun CreateProductForm(
                     modifier = Modifier
                         .weight(1f)
                         .height(48.dp)
+                        .testTag("btn_cancel_create_product")
                 ) {
                     Text("Cancelar")
                 }
@@ -583,5 +865,6 @@ private fun CreateProductForm(
                 }
             }
         }
+    }
     }
 }

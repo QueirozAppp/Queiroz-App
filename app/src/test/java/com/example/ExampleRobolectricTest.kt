@@ -881,6 +881,58 @@ class ExampleRobolectricTest {
         assertTrue("AppColors.isDark must be true when dark mode is toggled back", com.example.ui.components.AppColors.isDark)
     }
 
+    @Test
+    fun `request product viewmodel validates photo name and invalid price`() {
+        val viewModel = com.example.ui.product.request.RequestProductViewModel()
+        val adminProfile = UserProfile(uid = "a1", email = "admin@superqueiroz.com", role = UserRole.ADMIN)
+
+        // Sem foto
+        viewModel.submitRequest(adminProfile)
+        assertEquals("Tire ou selecione uma foto do produto para continuar.", viewModel.uiState.value.errorMessage)
+
+        // Com foto, sem nome
+        viewModel.onPhotoCaptured("ZmFrZV9iYXNlNjQ=")
+        viewModel.submitRequest(adminProfile)
+        assertEquals("Informe a descrição ou nome do produto.", viewModel.uiState.value.errorMessage)
+
+        // Com nome, preço inválido
+        viewModel.onNameChanged("Ster Bom")
+        viewModel.onPriceChanged("abc")
+        viewModel.submitRequest(adminProfile)
+        assertNotNull("Invalid price should produce validation error", viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun `admin products viewmodel restricts edit and delete to admin and avarista only`() {
+        val viewModel = AdminProductsViewModel()
+        val sampleProduct = Product(id = "p_1", barcode = "7898005516175", name = "Ster Bom", unit = "UN", active = true)
+        val leaderProfile = UserProfile(uid = "l1", name = "Líder", role = UserRole.SETOR_LEADER, storeId = "LOJA_01")
+        val avaristaProfile = UserProfile(uid = "v1", name = "Avarista", role = UserRole.AVARISTA, storeId = "LOJA_01")
+
+        viewModel.selectProduct(sampleProduct)
+        assertEquals(sampleProduct, viewModel.uiState.value.selectedProduct)
+
+        // Líder de setor NÃO pode editar ou excluir
+        viewModel.setUserProfile(leaderProfile)
+        viewModel.startEditingSelectedProduct()
+        assertFalse(viewModel.uiState.value.isEditingSelectedProduct)
+        assertNotNull(viewModel.uiState.value.errorMessage)
+
+        viewModel.promptDeleteProduct()
+        assertFalse(viewModel.uiState.value.showDeleteConfirmation)
+
+        // Avarista PODE editar e abrir confirmação de exclusão
+        viewModel.setUserProfile(avaristaProfile)
+        viewModel.startEditingSelectedProduct()
+        assertTrue(viewModel.uiState.value.isEditingSelectedProduct)
+
+        viewModel.cancelEditingSelectedProduct()
+        assertFalse(viewModel.uiState.value.isEditingSelectedProduct)
+
+        viewModel.promptDeleteProduct()
+        assertTrue(viewModel.uiState.value.showDeleteConfirmation)
+    }
+
     private fun assertNotEquals(message: String, illegal: Any?, actual: Any?) {
         assertFalse(message, illegal == actual)
     }

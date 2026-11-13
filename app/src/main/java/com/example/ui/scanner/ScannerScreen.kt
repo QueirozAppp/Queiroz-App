@@ -19,10 +19,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
@@ -80,6 +82,7 @@ fun ScannerScreen(
     viewModel: ScannerViewModel,
     onBackToHome: () -> Unit,
     onProductSelected: ((Product) -> Unit)? = null,
+    isForProductRegistration: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -139,6 +142,7 @@ fun ScannerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
@@ -214,21 +218,38 @@ fun ScannerScreen(
                         )
                     }
                 } else if (uiState.scannedProduct != null && !uiState.productInactive) {
-                    ResultCard(
-                        title = "Produto Localizado",
-                        titleColor = AppColors.StatusCompletedText,
-                        containerBg = AppColors.StatusCompletedBg,
-                        icon = Icons.Default.CheckCircle,
-                        product = uiState.scannedProduct,
-                        actionButtonText = if (onProductSelected != null) "Adicionar à Baixa" else "Escanear Outro",
-                        onAction = {
-                            if (onProductSelected != null && uiState.scannedProduct != null) {
-                                onProductSelected(uiState.scannedProduct!!)
-                            } else {
-                                viewModel.tryAgain()
+                    if (isForProductRegistration) {
+                        ResultCard(
+                            title = "Produto já cadastrado",
+                            titleColor = AppColors.StatusPendingText,
+                            containerBg = AppColors.StatusPendingBg,
+                            icon = Icons.Default.Warning,
+                            product = uiState.scannedProduct,
+                            subtitle = "Este código de barras já existe no catálogo geral.",
+                            actionButtonText = "Escanear Outro Código",
+                            onAction = viewModel::tryAgain,
+                            secondaryActionButtonText = "Usar código no cadastro mesmo assim",
+                            onSecondaryAction = {
+                                uiState.scannedProduct?.let { onProductSelected?.invoke(it) }
                             }
-                        }
-                    )
+                        )
+                    } else {
+                        ResultCard(
+                            title = "Produto Localizado",
+                            titleColor = AppColors.StatusCompletedText,
+                            containerBg = AppColors.StatusCompletedBg,
+                            icon = Icons.Default.CheckCircle,
+                            product = uiState.scannedProduct,
+                            actionButtonText = if (onProductSelected != null) "Adicionar à Baixa" else "Escanear Outro",
+                            onAction = {
+                                if (onProductSelected != null && uiState.scannedProduct != null) {
+                                    onProductSelected(uiState.scannedProduct!!)
+                                } else {
+                                    viewModel.tryAgain()
+                                }
+                            }
+                        )
+                    }
                 } else if (uiState.productInactive) {
                     ResultCard(
                         title = "Produto Inativo",
@@ -238,23 +259,43 @@ fun ScannerScreen(
                         product = uiState.scannedProduct,
                         subtitle = "Este produto está inativo no catálogo e não pode sofrer baixa.",
                         actionButtonText = "Tentar Novamente",
-                        onAction = viewModel::tryAgain
+                        onAction = viewModel::tryAgain,
+                        secondaryActionButtonText = if (isForProductRegistration && onProductSelected != null) "Usar código no cadastro" else null,
+                        onSecondaryAction = if (isForProductRegistration && onProductSelected != null) {
+                            { onProductSelected.invoke(Product(barcode = uiState.scannedBarcode ?: "")) }
+                        } else null
                     )
                 } else if (uiState.productNotFound) {
-                    ResultCard(
-                        title = "Produto não cadastrado",
-                        titleColor = AppColors.StatusDivergenceText,
-                        containerBg = AppColors.StatusDivergenceBg,
-                        icon = Icons.Default.Error,
-                        subtitle = "O código informado não corresponde a nenhum item cadastrado.",
-                        actionButtonText = "Tentar Novamente",
-                        onAction = viewModel::tryAgain,
-                        secondaryActionButtonText = if (onProductSelected != null) "Cadastrar novo produto" else null,
-                        onSecondaryAction = {
-                            // Passar o barcode para o caller, simulando um produto vazio
-                            onProductSelected?.invoke(Product(barcode = uiState.scannedBarcode ?: ""))
-                        }
-                    )
+                    if (isForProductRegistration && onProductSelected != null) {
+                        ResultCard(
+                            title = "Código Disponível para Cadastro",
+                            titleColor = AppColors.StatusCompletedText,
+                            containerBg = AppColors.StatusCompletedBg,
+                            icon = Icons.Default.CheckCircle,
+                            subtitle = "Código lido: ${uiState.scannedBarcode ?: ""}. Nenhum produto cadastrado com este código.",
+                            actionButtonText = "Usar Código no Cadastro",
+                            onAction = {
+                                onProductSelected.invoke(Product(barcode = uiState.scannedBarcode ?: ""))
+                            },
+                            secondaryActionButtonText = "Escanear Novamente",
+                            onSecondaryAction = viewModel::tryAgain
+                        )
+                    } else {
+                        ResultCard(
+                            title = "Produto não cadastrado",
+                            titleColor = AppColors.StatusDivergenceText,
+                            containerBg = AppColors.StatusDivergenceBg,
+                            icon = Icons.Default.Error,
+                            subtitle = "O código informado não corresponde a nenhum item cadastrado.",
+                            actionButtonText = "Tentar Novamente",
+                            onAction = viewModel::tryAgain,
+                            secondaryActionButtonText = if (onProductSelected != null) "Cadastrar novo produto" else null,
+                            onSecondaryAction = {
+                                // Passar o barcode para o caller, simulando um produto vazio
+                                onProductSelected?.invoke(Product(barcode = uiState.scannedBarcode ?: ""))
+                            }
+                        )
+                    }
                 } else if (!uiState.errorMessage.isNullOrEmpty()) {
                     ResultCard(
                         title = "Erro na Leitura",

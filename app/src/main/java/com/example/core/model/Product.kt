@@ -11,6 +11,7 @@ data class Product(
     val name: String = "",
     val price: Double = 0.0,
     val unit: String = ProductUnit.UN.name,
+    val photoBase64: String = "",
     val active: Boolean = true,
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L

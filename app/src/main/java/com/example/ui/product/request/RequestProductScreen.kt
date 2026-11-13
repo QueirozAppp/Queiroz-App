@@ -90,10 +90,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.core.model.ProductRegistrationRequest
 import com.example.core.model.ProductRequestStatus
 import com.example.core.model.UserProfile
+import com.example.core.util.ImageCompressionUtils
 import com.example.ui.components.AppColors
 import com.example.ui.components.AppEmptyState
 import com.example.ui.components.AppSectionHeader
-import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -125,14 +125,12 @@ fun RequestProductScreen(
     ) { uri: Uri? ->
         if (uri != null) {
             try {
-                context.contentResolver.openInputStream(uri)?.use { stream ->
-                    val bitmap = BitmapFactory.decodeStream(stream)
-                    if (bitmap != null) {
-                        val base64 = resizeAndCompressBitmap(bitmap)
-                        viewModel.onPhotoCaptured(base64)
-                    } else {
-                        viewModel.setErrorMessage("Não foi possível processar a imagem da galeria.")
-                    }
+                val bitmap = ImageCompressionUtils.decodeScaledBitmapFromUri(context, uri)
+                if (bitmap != null) {
+                    val base64 = ImageCompressionUtils.resizeAndCompressBitmap(bitmap)
+                    viewModel.onPhotoCaptured(base64)
+                } else {
+                    viewModel.setErrorMessage("Não foi possível processar a imagem da galeria.")
                 }
             } catch (e: Exception) {
                 viewModel.setErrorMessage("Erro ao carregar foto da galeria: ${e.localizedMessage ?: e.message}")
@@ -146,7 +144,7 @@ fun RequestProductScreen(
     ) { bitmap: Bitmap? ->
         if (bitmap != null) {
             try {
-                val base64 = resizeAndCompressBitmap(bitmap)
+                val base64 = ImageCompressionUtils.resizeAndCompressBitmap(bitmap)
                 viewModel.onPhotoCaptured(base64)
             } catch (e: Exception) {
                 viewModel.setErrorMessage("Erro ao processar foto da câmera: ${e.localizedMessage ?: e.message}")
@@ -186,6 +184,9 @@ fun RequestProductScreen(
         }
     }
 
+    val isDirectPublisher = userProfile.role == com.example.core.model.UserRole.ADMIN ||
+        userProfile.role == com.example.core.model.UserRole.AVARISTA
+
     Scaffold(
         modifier = modifier
             .fillMaxSize()
@@ -195,7 +196,7 @@ fun RequestProductScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Solicitar Cadastro de Produto",
+                        text = if (isDirectPublisher) "Cadastrar Novo Produto" else "Solicitar Cadastro de Produto",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = AppColors.TextPrimary
@@ -247,7 +248,7 @@ fun RequestProductScreen(
                     onClick = { viewModel.onTabChanged(1) },
                     text = {
                         Text(
-                            text = "Minhas Solicitações (${uiState.myRequests.size})",
+                            text = if (isDirectPublisher) "Cadastros (${uiState.myRequests.size})" else "Minhas Solicitações (${uiState.myRequests.size})",
                             fontWeight = if (uiState.activeTab == 1) FontWeight.Bold else FontWeight.Normal,
                             color = if (uiState.activeTab == 1) AppColors.Primary else AppColors.TextSecondary
                         )
@@ -266,7 +267,7 @@ fun RequestProductScreen(
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(14.dp),
+                        modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp, end = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -280,8 +281,17 @@ fun RequestProductScreen(
                             text = uiState.successMessage ?: "",
                             color = AppColors.StatusCompletedText,
                             style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f)
                         )
+                        IconButton(onClick = viewModel::clearMessages) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Fechar aviso",
+                                tint = AppColors.StatusCompletedText,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -297,7 +307,7 @@ fun RequestProductScreen(
                         .testTag("request_product_error")
                 ) {
                     Row(
-                        modifier = Modifier.padding(14.dp),
+                        modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp, end = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -311,8 +321,17 @@ fun RequestProductScreen(
                             text = uiState.errorMessage ?: "",
                             color = AppColors.StatusDivergenceText,
                             style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f)
                         )
+                        IconButton(onClick = viewModel::clearMessages) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Fechar erro",
+                                tint = AppColors.StatusDivergenceText,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -346,18 +365,22 @@ fun RequestProductScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = "Setor Solicitante",
+                                    text = if (isDirectPublisher) "Publicação Direta no Catálogo" else "Setor Solicitante",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = AppColors.TextTertiary
                                 )
                                 Text(
-                                    text = "Loja: ${userProfile.storeId}  •  Setor: ${userProfile.sectorId.ifBlank { "Geral" }}",
+                                    text = "Loja: ${userProfile.storeId.ifBlank { "Global" }}  •  Setor: ${userProfile.sectorId.ifBlank { "Geral" }}",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = AppColors.TextPrimary
                                 )
                                 Text(
-                                    text = "A solicitação será avaliada e aprovada pelo Avarista ou Administrador.",
+                                    text = if (isDirectPublisher) {
+                                        "O item será adicionado imediatamente ao catálogo global de todas as lojas."
+                                    } else {
+                                        "A solicitação será avaliada e aprovada pelo Avarista ou Administrador."
+                                    },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = AppColors.TextSecondary
                                 )
@@ -486,7 +509,7 @@ fun RequestProductScreen(
                                         colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
                                         modifier = Modifier
                                             .weight(1f)
-                                            .height(44.dp)
+                                            .height(48.dp)
                                             .testTag("btn_take_product_photo")
                                     ) {
                                         Icon(
@@ -513,7 +536,7 @@ fun RequestProductScreen(
                                         colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.Primary),
                                         modifier = Modifier
                                             .weight(1f)
-                                            .height(44.dp)
+                                            .height(48.dp)
                                             .testTag("btn_pick_gallery_photo")
                                     ) {
                                         Icon(
@@ -653,7 +676,10 @@ fun RequestProductScreen(
                         } else {
                             Icon(Icons.Default.Inventory2, contentDescription = null, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Solicitar Cadastro de Produto", fontWeight = FontWeight.Bold)
+                            Text(
+                                text = if (isDirectPublisher) "Cadastrar Produto no Catálogo" else "Solicitar Cadastro de Produto",
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
@@ -663,9 +689,13 @@ fun RequestProductScreen(
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         AppEmptyState(
                             icon = Icons.Default.Inventory2,
-                            title = "Nenhuma solicitação encontrada",
-                            message = "Você ainda não enviou solicitações de cadastro de produtos.",
-                            actionButtonText = "Solicitar Novo Produto",
+                            title = if (isDirectPublisher) "Nenhum cadastro recente" else "Nenhuma solicitação encontrada",
+                            message = if (isDirectPublisher) {
+                                "Os produtos cadastrados por aqui aparecem nesta lista e no Catálogo Geral."
+                            } else {
+                                "Você ainda não enviou solicitações de cadastro de produtos."
+                            },
+                            actionButtonText = if (isDirectPublisher) "Cadastrar Novo Produto" else "Solicitar Novo Produto",
                             onActionClick = { viewModel.onTabChanged(0) }
                         )
                     }
@@ -855,23 +885,4 @@ private fun MyRequestItemCard(request: ProductRegistrationRequest) {
             }
         }
     }
-}
-
-private fun resizeAndCompressBitmap(bitmap: Bitmap, maxDimension: Int = 800, quality: Int = 75): String {
-    val width = bitmap.width
-    val height = bitmap.height
-    val scale = if (width > maxDimension || height > maxDimension) {
-        val maxSide = maxOf(width, height)
-        maxDimension.toFloat() / maxSide
-    } else 1.0f
-
-    val targetWidth = (width * scale).toInt().coerceAtLeast(1)
-    val targetHeight = (height * scale).toInt().coerceAtLeast(1)
-    val scaledBitmap = if (scale < 1.0f) {
-        Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)
-    } else bitmap
-
-    val outputStream = ByteArrayOutputStream()
-    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
-    return Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
 }
