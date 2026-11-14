@@ -510,7 +510,7 @@ private fun ProductItemCard(
                         color = AppColors.SecondaryContainer
                     ) {
                         Text(
-                            text = String.format("R$ %.2f", product.price),
+                            text = String.format(java.util.Locale.getDefault(), "R$ %.2f", product.price),
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,

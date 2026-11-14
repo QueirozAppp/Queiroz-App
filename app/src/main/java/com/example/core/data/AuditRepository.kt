@@ -111,12 +111,16 @@ class AuditRepository {
 
             val snapshot = query.get().await()
             val list = snapshot.documents.mapNotNull { doc ->
-                val base = doc.toObject(AuditLog::class.java)
-                val ts = doc.getTimestamp("timestamp")?.toDate()?.time
-                    ?: (doc.get("timestamp") as? Number)?.toLong()
-                    ?: base?.timestamp
-                    ?: 0L
-                base?.copy(id = doc.id, timestamp = ts)
+                try {
+                    val base = doc.toObject(AuditLog::class.java)
+                    val ts = doc.getTimestamp("timestamp")?.toDate()?.time
+                        ?: (doc.get("timestamp") as? Number)?.toLong()
+                        ?: base?.timestamp
+                        ?: 0L
+                    base?.copy(id = doc.id, timestamp = ts)
+                } catch (_: Exception) {
+                    null
+                }
             }
             Result.success(list)
         } catch (e: Exception) {
@@ -131,12 +135,16 @@ class AuditRepository {
 
                 val snapshot = fallbackQuery.get().await()
                 var list = snapshot.documents.mapNotNull { doc ->
-                    val base = doc.toObject(AuditLog::class.java)
-                    val ts = doc.getTimestamp("timestamp")?.toDate()?.time
-                        ?: (doc.get("timestamp") as? Number)?.toLong()
-                        ?: base?.timestamp
-                        ?: 0L
-                    base?.copy(id = doc.id, timestamp = ts)
+                    try {
+                        val base = doc.toObject(AuditLog::class.java)
+                        val ts = doc.getTimestamp("timestamp")?.toDate()?.time
+                            ?: (doc.get("timestamp") as? Number)?.toLong()
+                            ?: base?.timestamp
+                            ?: 0L
+                        base?.copy(id = doc.id, timestamp = ts)
+                    } catch (_: Exception) {
+                        null
+                    }
                 }
 
                 if (!filterRole.isNullOrBlank() && filterRole != "ALL") {

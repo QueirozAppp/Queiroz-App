@@ -35,19 +35,28 @@ class FirestoreRepository {
             return@callbackFlow
         }
 
-        val listener = db.collection(COLLECTION_STORES)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    trySend(emptyList())
-                    return@addSnapshotListener
+        val listener = try {
+            db.collection(COLLECTION_STORES)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        trySend(emptyList())
+                        return@addSnapshotListener
+                    }
+                    val list = snapshot?.documents?.mapNotNull { doc ->
+                        try {
+                            doc.toObject(Store::class.java)?.copy(id = doc.id)
+                        } catch (_: Exception) {
+                            null
+                        }
+                    } ?: emptyList()
+                    trySend(list)
                 }
-                val list = snapshot?.documents?.mapNotNull { doc ->
-                    doc.toObject(Store::class.java)?.copy(id = doc.id)
-                } ?: emptyList()
-                trySend(list)
-            }
+        } catch (_: Exception) {
+            trySend(emptyList())
+            null
+        }
 
-        awaitClose { listener.remove() }
+        awaitClose { listener?.remove() }
     }
 
     /**
@@ -61,19 +70,28 @@ class FirestoreRepository {
             return@callbackFlow
         }
 
-        val listener = db.collection(COLLECTION_PRODUCTS)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    trySend(emptyList())
-                    return@addSnapshotListener
+        val listener = try {
+            db.collection(COLLECTION_PRODUCTS)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        trySend(emptyList())
+                        return@addSnapshotListener
+                    }
+                    val list = snapshot?.documents?.mapNotNull { doc ->
+                        try {
+                            doc.toObject(Product::class.java)?.copy(id = doc.id)
+                        } catch (_: Exception) {
+                            null
+                        }
+                    } ?: emptyList()
+                    trySend(list)
                 }
-                val list = snapshot?.documents?.mapNotNull { doc ->
-                    doc.toObject(Product::class.java)?.copy(id = doc.id)
-                } ?: emptyList()
-                trySend(list)
-            }
+        } catch (_: Exception) {
+            trySend(emptyList())
+            null
+        }
 
-        awaitClose { listener.remove() }
+        awaitClose { listener?.remove() }
     }
 
     /**

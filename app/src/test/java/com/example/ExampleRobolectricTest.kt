@@ -24,6 +24,9 @@ import com.example.ui.conference.ConferenceViewModel
 import com.example.ui.foundation.FoundationViewModel
 import com.example.ui.scanner.ScannerViewModel
 import com.example.ui.withdrawal.NewRequestViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -31,6 +34,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
@@ -931,6 +935,120 @@ class ExampleRobolectricTest {
 
         viewModel.promptDeleteProduct()
         assertTrue(viewModel.uiState.value.showDeleteConfirmation)
+    }
+
+    @Test
+    fun `app update manager detects newer build respects 6h interval and dismiss choice`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.getSharedPreferences("qrz_app_update_prefs", Context.MODE_PRIVATE).edit().clear().commit()
+
+        var now = 1_000_000L
+        var networkCalls = 0
+        val remoteNewer = com.example.core.update.RemoteVersionInfo(
+            version = "1.3.0",
+            build = 13,
+            notes = "Novidades",
+            url = "https://github.com/QueirozAppp/Queiroz-App/releases/latest/download/app-debug.apk"
+        )
+
+        val manager = com.example.core.update.AppUpdateManager(
+            context = context,
+            currentBuild = com.example.core.update.AppUpdateConfig.APP_BUILD,
+            nowProvider = { now },
+            fetcher = {
+                networkCalls++
+                remoteNewer
+            }
+        )
+
+        // 1. Primeira verificação automática detecta build 13 > 12
+        val first = kotlinx.coroutines.runBlocking { manager.checkForUpdate(force = false) }
+        assertTrue(first is com.example.core.update.UpdateCheckOutcome.UpdateAvailable)
+        assertEquals(1, networkCalls)
+        assertTrue(manager.shouldDisplayBanner(remoteNewer, forceShow = false))
+
+        // 2. Dentro das 6h não chama rede novamente e mantém versão encontrada em cache
+        now += 60_000L
+        val within6h = kotlinx.coroutines.runBlocking { manager.checkForUpdate(force = false) }
+        assertTrue(within6h is com.example.core.update.UpdateCheckOutcome.UpdateAvailable)
+        assertEquals(1, networkCalls)
+
+        // 3. Ao clicar "Depois", esconde automaticamente a versão 13, mas verificação manual força exibição
+        manager.dismissVersion(13)
+        assertFalse(manager.shouldDisplayBanner(remoteNewer, forceShow = false))
+        assertTrue(manager.shouldDisplayBanner(remoteNewer, forceShow = true))
+
+        // 4. Forçar manualmente ignora intervalo de 6h
+        val forced = kotlinx.coroutines.runBlocking { manager.checkForUpdate(force = true) }
+        assertTrue(forced is com.example.core.update.UpdateCheckOutcome.UpdateAvailable)
+        assertEquals(2, networkCalls)
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun `app update viewmodel manual check shows expected messages for up-to-date available and offline`() {
+        val application = ApplicationProvider.getApplicationContext<Application>()
+        application.getSharedPreferences("qrz_app_update_prefs", Context.MODE_PRIVATE).edit().clear().commit()
+        val dispatcher = kotlinx.coroutines.test.UnconfinedTestDispatcher()
+        Dispatchers.setMain(dispatcher)
+        try {
+            var nextResponse: com.example.core.update.RemoteVersionInfo? =
+                com.example.core.update.RemoteVersionInfo("1.2.0", 12, "Atual", "https://example.com/app.apk")
+
+            val manager = com.example.core.update.AppUpdateManager(
+                context = application,
+                currentBuild = 12,
+                fetcher = { nextResponse }
+            )
+            val viewModel = com.example.ui.update.AppUpdateViewModel(application, manager)
+
+            // Já está na mais recente
+            viewModel.checkManually()
+            assertEquals("Você já está na versão mais recente.", viewModel.uiState.value.statusMessage)
+            assertFalse(viewModel.uiState.value.showBanner)
+
+            // Versão disponível (mesmo que antes tivesse clicado "Depois")
+            manager.dismissVersion(13)
+            nextResponse = com.example.core.update.RemoteVersionInfo("1.3.0", 13, "Correções", "https://example.com/app.apk")
+            viewModel.checkManually()
+            assertEquals("Versão 1.3.0 disponível.", viewModel.uiState.value.statusMessage)
+            assertTrue(viewModel.uiState.value.showBanner)
+
+            // Sem conexão
+            nextResponse = null
+            viewModel.checkManually()
+            assertEquals("Não consegui verificar. Confira a conexão.", viewModel.uiState.value.statusMessage)
+            assertTrue(viewModel.uiState.value.isStatusError)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `main activity launches cleanly without crashing`() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+        assertNotNull(activity)
+        controller.pause().stop().destroy()
+    }
+
+    @Test
+    fun `main activity and viewmodel factory survive corrupted shared preferences on cold start`() {
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        context.getSharedPreferences("qrz_app_update_prefs", Context.MODE_PRIVATE)
+            .edit().putString("last_check_at", "corrupted").putString("dismissed_build", "bad").commit()
+        context.getSharedPreferences("queiroz_avaria_theme_prefs", Context.MODE_PRIVATE)
+            .edit().putInt("theme_mode", 999).commit()
+        context.getSharedPreferences("qrz_stock_auth_prefs", Context.MODE_PRIVATE)
+            .edit().putInt("last_email", 123).commit()
+
+        val factory = com.example.ui.update.AppUpdateViewModelFactory(context)
+        val updateVm = factory.create(com.example.ui.update.AppUpdateViewModel::class.java)
+        assertNotNull(updateVm)
+
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        assertNotNull(controller.get())
+        controller.pause().stop().destroy()
     }
 
     private fun assertNotEquals(message: String, illegal: Any?, actual: Any?) {

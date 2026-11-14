@@ -7,7 +7,6 @@ import com.example.core.model.Product
 import com.example.core.model.ProductRequestStatus
 import com.example.core.model.UserProfile
 import com.example.core.model.UserRole
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -157,7 +156,7 @@ class ProductRepository(
     }
 
     private suspend fun getApprovedFromRequests(db: FirebaseFirestore): List<Product> {
-        if (FirebaseAuth.getInstance().currentUser == null) return emptyList()
+        if (FirebaseProvider.getAuthOrNull()?.currentUser == null) return emptyList()
         return try {
             val snapshot = db.collection(COLLECTION_REQUESTS)
                 .whereEqualTo("status", ProductRequestStatus.APPROVED.name)
@@ -171,7 +170,7 @@ class ProductRepository(
     }
 
     private suspend fun getFromCloudFallback(db: FirebaseFirestore): Pair<List<Product>, Set<String>> {
-        if (FirebaseAuth.getInstance().currentUser == null) return emptyList<Product>() to emptySet()
+        if (FirebaseProvider.getAuthOrNull()?.currentUser == null) return emptyList<Product>() to emptySet()
         return try {
             val snapshot = db.collection(COLLECTION_CLOUD_FALLBACK)
                 .whereEqualTo("storeId", GLOBAL_PRODUCTS_STORE_KEY)
@@ -197,7 +196,7 @@ class ProductRepository(
     }
 
     private suspend fun getFromEvidenceCatalog(db: FirebaseFirestore): Pair<List<Product>, Set<String>> {
-        if (FirebaseAuth.getInstance().currentUser == null) return emptyList<Product>() to emptySet()
+        if (FirebaseProvider.getAuthOrNull()?.currentUser == null) return emptyList<Product>() to emptySet()
         return try {
             val snapshot = db.collection(COLLECTION_WITHDRAWAL)
                 .document(CATALOG_DOC_ID)
@@ -229,7 +228,7 @@ class ProductRepository(
      */
     suspend fun getAllProducts(): Result<List<Product>> {
         val db = firestore ?: return Result.success(memoryCache)
-        if (FirebaseAuth.getInstance().currentUser == null) {
+        if (FirebaseProvider.getAuthOrNull()?.currentUser == null) {
             return Result.success(memoryCache)
         }
 
@@ -268,7 +267,7 @@ class ProductRepository(
      */
     val productsFlow: Flow<List<Product>> = callbackFlow {
         val db = firestore
-        val user = FirebaseAuth.getInstance().currentUser
+        val user = FirebaseProvider.getAuthOrNull()?.currentUser
         if (db == null || user == null) {
             trySend(memoryCache)
             close()
@@ -468,7 +467,7 @@ class ProductRepository(
         var anySucceeded = false
         val now = System.currentTimeMillis()
         val authorName = userProfile?.name?.ifBlank { userProfile.email } ?: "Administrador"
-        val authorUid = userProfile?.uid ?: FirebaseAuth.getInstance().currentUser?.uid ?: "admin_system"
+        val authorUid = userProfile?.uid ?: FirebaseProvider.getAuthOrNull()?.currentUser?.uid ?: "admin_system"
         val authorStore = userProfile?.storeId?.ifBlank { "GLOBAL" } ?: "GLOBAL"
         val authorSector = userProfile?.sectorId?.ifBlank { "Geral" } ?: "Geral"
 
@@ -560,7 +559,7 @@ class ProductRepository(
         userProfile: UserProfile? = null
     ): Result<String> {
         val db = firestore ?: return Result.failure(IllegalStateException("Firestore não inicializado."))
-        if (FirebaseAuth.getInstance().currentUser == null) {
+        if (FirebaseProvider.getAuthOrNull()?.currentUser == null) {
             return Result.failure(IllegalStateException("Sessão expirada. Faça login novamente."))
         }
 
@@ -593,7 +592,7 @@ class ProductRepository(
 
             updateCache(product)
 
-            val currentUid = userProfile?.uid ?: FirebaseAuth.getInstance().currentUser?.uid ?: "admin_system"
+            val currentUid = userProfile?.uid ?: FirebaseProvider.getAuthOrNull()?.currentUser?.uid ?: "admin_system"
             val currentRole = userProfile?.role?.name ?: "ADMIN"
             val currentName = userProfile?.name?.ifBlank { userProfile.email } ?: "Administrador"
             auditRepository.logEvent(
@@ -711,7 +710,7 @@ class ProductRepository(
 
             updateCache(updatedProduct)
 
-            val uid = userProfile?.uid ?: FirebaseAuth.getInstance().currentUser?.uid ?: "system"
+            val uid = userProfile?.uid ?: FirebaseProvider.getAuthOrNull()?.currentUser?.uid ?: "system"
             val userName = userProfile?.name?.ifBlank { userProfile.email } ?: "Usuário"
             val userRole = userProfile?.role?.name ?: "ADMIN"
 
@@ -862,7 +861,7 @@ class ProductRepository(
 
             invalidateDeleted(productId)
 
-            val uid = userProfile?.uid ?: FirebaseAuth.getInstance().currentUser?.uid ?: "system"
+            val uid = userProfile?.uid ?: FirebaseProvider.getAuthOrNull()?.currentUser?.uid ?: "system"
             val userName = userProfile?.name?.ifBlank { userProfile.email } ?: "Usuário"
             val userRole = userProfile?.role?.name ?: "ADMIN"
             val prodName = targetProduct?.name ?: productId
@@ -951,7 +950,7 @@ class ProductRepository(
 
             memoryCache = memoryCache.map { if (it.id == productId) it.copy(active = active, updatedAt = now) else it }
 
-            val currentUid = userProfile?.uid ?: FirebaseAuth.getInstance().currentUser?.uid ?: "admin_system"
+            val currentUid = userProfile?.uid ?: FirebaseProvider.getAuthOrNull()?.currentUser?.uid ?: "admin_system"
             val currentRole = userProfile?.role?.name ?: "ADMIN"
             val currentName = userProfile?.name?.ifBlank { userProfile?.email } ?: "Administrador"
             val action = if (active) AuditAction.PRODUCT_ACTIVATED else AuditAction.PRODUCT_DEACTIVATED

@@ -3,8 +3,8 @@ package com.example.ui.admin.product
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.core.data.ProductRepository
+import com.example.core.firebase.FirebaseProvider
 import com.example.core.model.Product
-import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,7 +25,7 @@ class AdminProductsViewModel(
     private var isObserving = false
 
     init {
-        if (FirebaseAuth.getInstance().currentUser != null) {
+        if (FirebaseProvider.getAuthOrNull()?.currentUser != null) {
             _uiState.update { it.copy(isLoading = true) }
             observeProducts()
             refreshProducts()
@@ -33,7 +33,7 @@ class AdminProductsViewModel(
     }
 
     fun refreshProducts() {
-        val currentUser = FirebaseAuth.getInstance().currentUser
+        val currentUser = FirebaseProvider.getAuthOrNull()?.currentUser
         if (currentUser == null) {
             _uiState.update { it.copy(isLoading = false) }
             return
@@ -57,7 +57,7 @@ class AdminProductsViewModel(
     }
 
     private fun observeProducts() {
-        if (isObserving || FirebaseAuth.getInstance().currentUser == null) return
+        if (isObserving || FirebaseProvider.getAuthOrNull()?.currentUser == null) return
         isObserving = true
         viewModelScope.launch {
             productRepository.productsFlow.collect { list ->

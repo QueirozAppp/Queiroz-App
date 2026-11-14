@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.core.firebase.FirebaseProvider
 import com.example.core.model.UserRole
 import com.example.ui.admin.AdminUsersScreen
 import com.example.ui.admin.AdminUsersViewModel
@@ -48,6 +49,8 @@ import com.example.ui.scanner.ScannerScreen
 import com.example.ui.scanner.ScannerViewModel
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.ThemeManager
+import com.example.ui.update.AppUpdateViewModel
+import com.example.ui.update.AppUpdateViewModelFactory
 import com.example.ui.withdrawal.MyRequestsScreen
 import com.example.ui.withdrawal.NewRequestScreen
 import com.example.ui.withdrawal.NewRequestViewModel
@@ -59,36 +62,34 @@ import com.example.ui.withdrawal.NewRequestViewModel
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        ThemeManager.initialize(applicationContext)
+        try {
+            ThemeManager.initialize(applicationContext)
+        } catch (_: Exception) {
+        }
+        try {
+            FirebaseProvider.getStatus(applicationContext)
+        } catch (_: Exception) {
+        }
         enableEdgeToEdge()
         setContent {
             val isDark = ThemeManager.isDark()
             MyApplicationTheme(darkTheme = isDark) {
                 val loginViewModel: LoginViewModel = viewModel()
                 val context = LocalContext.current.applicationContext
-                val adminUsersViewModel: AdminUsersViewModel = viewModel(
-                    factory = AdminUsersViewModelFactory(context)
+                val appUpdateViewModel: AppUpdateViewModel = viewModel(
+                    factory = AppUpdateViewModelFactory(application)
                 )
-                val adminStoresViewModel: AdminStoresViewModel = viewModel()
-                val adminSectorsViewModel: AdminSectorsViewModel = viewModel()
-                val adminProductsViewModel: AdminProductsViewModel = viewModel(
-                    factory = AdminProductsViewModelFactory()
-                )
-                val scannerViewModel: ScannerViewModel = viewModel()
-                val newRequestViewModel: NewRequestViewModel = viewModel()
-                val conferenceViewModel: ConferenceViewModel = viewModel()
-                val historyViewModel: HistoryViewModel = viewModel()
-                val auditLogViewModel: AuditLogViewModel = viewModel(
-                    factory = AuditLogViewModelFactory()
-                )
-                val operationalCenterViewModel: OperationalCenterViewModel = viewModel()
-                val reportsViewModel: ReportsViewModel = viewModel()
-                val requestProductViewModel: RequestProductViewModel = viewModel()
-                val productApprovalViewModel: ProductApprovalViewModel = viewModel()
                 val uiState by loginViewModel.uiState.collectAsStateWithLifecycle()
+                val updateUiState by appUpdateViewModel.uiState.collectAsStateWithLifecycle()
 
                 val authenticatedState = uiState.authState as? AuthState.Authenticated
                 val mustChangePassword = authenticatedState?.userProfile?.mustChangePassword == true
+
+                androidx.compose.runtime.LaunchedEffect(authenticatedState?.userProfile?.uid) {
+                    if (authenticatedState != null && !mustChangePassword) {
+                        appUpdateViewModel.checkAutomaticallyIfNeeded()
+                    }
+                }
 
                 var currentScreen by remember { mutableStateOf("home") }
                 var selectedConferenceRequestId by remember { mutableStateOf("") }
@@ -123,228 +124,246 @@ class MainActivity : ComponentActivity() {
                             }
                         )
                     }
-                    currentScreen == "admin_users" -> {
-                        AdminUsersScreen(
-                            viewModel = adminUsersViewModel,
-                            onBackToHome = { currentScreen = "home" }
-                        )
-                    }
-                    currentScreen == "admin_stores" -> {
-                        AdminStoresScreen(
-                            viewModel = adminStoresViewModel,
-                            onOpenSectors = { storeId ->
-                                selectedStoreIdForSectors = storeId
-                                currentScreen = "admin_sectors"
-                            },
-                            onBackToHome = { currentScreen = "home" }
-                        )
-                    }
-                    currentScreen == "admin_sectors" -> {
-                        AdminSectorsScreen(
-                            storeId = selectedStoreIdForSectors,
-                            viewModel = adminSectorsViewModel,
-                            onBackToStores = { currentScreen = "admin_stores" }
-                        )
-                    }
-                    currentScreen == "admin_audit" -> {
-                        AuditLogScreen(
-                            viewModel = auditLogViewModel,
-                            onBackToHome = { currentScreen = "home" }
-                        )
-                    }
-                    currentScreen == "reports" -> {
-                        val profile = (uiState.authState as AuthState.Authenticated).userProfile
-                        ReportsScreen(
-                            viewModel = reportsViewModel,
-                            userProfile = profile,
-                            onOpenOperationalStatus = { status ->
-                                operationalCenterViewModel.setStatusFilter(status)
-                                currentScreen = "operational_center"
-                            },
-                            onBackToHome = { currentScreen = "home" }
-                        )
-                    }
-                    currentScreen == "operational_center" -> {
-                        val profile = (uiState.authState as AuthState.Authenticated).userProfile
-                        com.example.ui.operational.OperationalCenterScreen(
-                            viewModel = operationalCenterViewModel,
-                            userProfile = profile,
-                            onOpenRequestDetail = { reqId ->
-                                selectedConferenceRequestId = reqId
-                                conferenceSourceScreen = "operational_center"
-                                conferenceReadOnly = true
-                                currentScreen = "conference_detail"
-                            },
-                            onOpenConferenceDetail = { reqId ->
-                                selectedConferenceRequestId = reqId
-                                conferenceSourceScreen = "operational_center"
-                                conferenceReadOnly = false
-                                currentScreen = "conference_detail"
-                            },
-                            onBackToHome = { currentScreen = "home" }
-                        )
-                    }
-                    currentScreen == "products" -> {
-                        val profile = (uiState.authState as AuthState.Authenticated).userProfile
-                        androidx.compose.runtime.LaunchedEffect(profile) {
-                            adminProductsViewModel.setUserProfile(profile)
-                            adminProductsViewModel.refreshProducts()
-                        }
-                        AdminProductsScreen(
-                            viewModel = adminProductsViewModel,
-                            onBackToHome = { currentScreen = "home" },
-                            userProfile = profile,
-                            isAdmin = profile.role == UserRole.ADMIN,
-                            onOpenScanner = {
-                                scannerViewModel.tryAgain()
-                                scannerSourceScreen = "products"
-                                currentScreen = "scanner"
-                            },
-                            onOpenApprovals = {
-                                currentScreen = "product_approval"
-                            }
-                        )
-                    }
-                    currentScreen == "request_product" -> {
-                        val profile = (uiState.authState as AuthState.Authenticated).userProfile
-                        RequestProductScreen(
-                            viewModel = requestProductViewModel,
-                            userProfile = profile,
-                            onOpenScanner = {
-                                scannerViewModel.tryAgain()
-                                scannerSourceScreen = "request_product"
-                                currentScreen = "scanner"
-                            },
-                            onBackToHome = { currentScreen = "home" }
-                        )
-                    }
-                    currentScreen == "product_approval" -> {
-                        val profile = (uiState.authState as AuthState.Authenticated).userProfile
-                        ProductApprovalScreen(
-                            viewModel = productApprovalViewModel,
-                            userProfile = profile,
-                            onBackToHome = { currentScreen = "home" }
-                        )
-                    }
-                    currentScreen == "history" -> {
-                        val profile = (uiState.authState as AuthState.Authenticated).userProfile
-                        androidx.compose.runtime.LaunchedEffect(profile) {
-                            historyViewModel.loadHistory(profile)
-                        }
-                        HistoryScreen(
-                            viewModel = historyViewModel,
-                            userProfile = profile,
-                            onBackToHome = { currentScreen = "home" }
-                        )
-                    }
-                    currentScreen == "my_requests" -> {
-                        val profile = (uiState.authState as AuthState.Authenticated).userProfile
-                        MyRequestsScreen(
-                            userProfile = profile,
-                            onNewRequest = {
-                                newRequestSourceScreen = "my_requests"
-                                currentScreen = "new_request"
-                            },
-                            onBackToHome = { currentScreen = "home" }
-                        )
-                    }
-                    currentScreen == "new_request" -> {
-                        val profile = (uiState.authState as AuthState.Authenticated).userProfile
-                        NewRequestScreen(
-                            viewModel = newRequestViewModel,
-                            userProfile = profile,
-                            onOpenScanner = {
-                                scannerViewModel.tryAgain()
-                                scannerSourceScreen = "new_request"
-                                currentScreen = "scanner"
-                            },
-                            onBackToHome = { currentScreen = newRequestSourceScreen },
-                            onRequestSubmitted = { currentScreen = "my_requests" }
-                        )
-                    }
-                    currentScreen == "pending_conferences" -> {
-                        val profile = (uiState.authState as AuthState.Authenticated).userProfile
-                        PendingConferencesScreen(
-                            userProfile = profile,
-                            onOpenConferenceDetail = { reqId ->
-                                selectedConferenceRequestId = reqId
-                                conferenceSourceScreen = "pending_conferences"
-                                conferenceReadOnly = false
-                                currentScreen = "conference_detail"
-                            },
-                            onBackToHome = { currentScreen = "home" }
-                        )
-                    }
-                    currentScreen == "conference_detail" -> {
-                        val profile = (uiState.authState as AuthState.Authenticated).userProfile
-                        ConferenceDetailScreen(
-                            requestId = selectedConferenceRequestId,
-                            viewModel = conferenceViewModel,
-                            userProfile = profile,
-                            readOnlyView = conferenceReadOnly,
-                            backButtonLabel = if (conferenceSourceScreen == "operational_center") {
-                                "Voltar ao Centro Operacional"
-                            } else {
-                                "Voltar para Fila"
-                            },
-                            onBackToList = { currentScreen = conferenceSourceScreen }
-                        )
-                    }
-                    currentScreen == "scanner" -> {
-                        val isRegSource = scannerSourceScreen == "products" || scannerSourceScreen == "request_product"
-                        ScannerScreen(
-                            viewModel = scannerViewModel,
-                            onBackToHome = { currentScreen = scannerSourceScreen },
-                            isForProductRegistration = isRegSource,
-                            onProductSelected = { product ->
-                                when (scannerSourceScreen) {
-                                    "products" -> {
-                                        if (!adminProductsViewModel.uiState.value.isCreatingProduct) {
-                                            adminProductsViewModel.startCreatingProduct()
-                                        }
-                                        adminProductsViewModel.onNewBarcodeChanged(product.barcode)
-                                        if (product.name.isNotBlank()) {
-                                            adminProductsViewModel.onNewNameChanged(product.name)
-                                        }
-                                        currentScreen = "products"
-                                    }
-                                    "request_product" -> {
-                                        requestProductViewModel.onBarcodeChanged(product.barcode)
-                                        if (product.name.isNotBlank()) {
-                                            requestProductViewModel.onNameChanged(product.name)
-                                        }
-                                        currentScreen = "request_product"
-                                    }
-                                    else -> {
-                                        newRequestViewModel.onProductScannedOrSelected(product)
-                                        currentScreen = "new_request"
-                                    }
-                                }
-                            }
-                        )
-                    }
                     else -> {
                         val profile = (uiState.authState as AuthState.Authenticated).userProfile
-                        HomeAuthenticatedScreen(
-                            userProfile = profile,
-                            onLogout = { loginViewModel.logout() },
-                            onOpenNewRequest = {
-                                newRequestSourceScreen = "home"
-                                currentScreen = "new_request"
-                            },
-                            onOpenOperationalCenter = { currentScreen = "operational_center" },
-                            onOpenReports = { currentScreen = "reports" },
-                            onOpenAdminUsers = { currentScreen = "admin_users" },
-                            onOpenStores = { currentScreen = "admin_stores" },
-                            onOpenProducts = { currentScreen = "products" },
-                            onOpenScanner = { currentScreen = "scanner" },
-                            onOpenMyRequests = { currentScreen = "my_requests" },
-                            onOpenConferences = { currentScreen = "pending_conferences" },
-                            onOpenHistory = { currentScreen = "history" },
-                            onOpenAuditLogs = { currentScreen = "admin_audit" },
-                            onOpenRequestProduct = { currentScreen = "request_product" },
-                            onOpenProductApproval = { currentScreen = "product_approval" }
+                        val adminProductsViewModel: AdminProductsViewModel = viewModel(
+                            factory = AdminProductsViewModelFactory()
                         )
+                        val scannerViewModel: ScannerViewModel = viewModel()
+                        val newRequestViewModel: NewRequestViewModel = viewModel()
+                        val operationalCenterViewModel: OperationalCenterViewModel = viewModel()
+                        val requestProductViewModel: RequestProductViewModel = viewModel()
+
+                        when (currentScreen) {
+                            "admin_users" -> {
+                                val adminUsersViewModel: AdminUsersViewModel = viewModel(
+                                    factory = AdminUsersViewModelFactory(context)
+                                )
+                                AdminUsersScreen(
+                                    viewModel = adminUsersViewModel,
+                                    onBackToHome = { currentScreen = "home" }
+                                )
+                            }
+                            "admin_stores" -> {
+                                val adminStoresViewModel: AdminStoresViewModel = viewModel()
+                                AdminStoresScreen(
+                                    viewModel = adminStoresViewModel,
+                                    onOpenSectors = { storeId ->
+                                        selectedStoreIdForSectors = storeId
+                                        currentScreen = "admin_sectors"
+                                    },
+                                    onBackToHome = { currentScreen = "home" }
+                                )
+                            }
+                            "admin_sectors" -> {
+                                val adminSectorsViewModel: AdminSectorsViewModel = viewModel()
+                                AdminSectorsScreen(
+                                    storeId = selectedStoreIdForSectors,
+                                    viewModel = adminSectorsViewModel,
+                                    onBackToStores = { currentScreen = "admin_stores" }
+                                )
+                            }
+                            "admin_audit" -> {
+                                val auditLogViewModel: AuditLogViewModel = viewModel(
+                                    factory = AuditLogViewModelFactory()
+                                )
+                                AuditLogScreen(
+                                    viewModel = auditLogViewModel,
+                                    onBackToHome = { currentScreen = "home" }
+                                )
+                            }
+                            "reports" -> {
+                                val reportsViewModel: ReportsViewModel = viewModel()
+                                ReportsScreen(
+                                    viewModel = reportsViewModel,
+                                    userProfile = profile,
+                                    onOpenOperationalStatus = { status ->
+                                        operationalCenterViewModel.setStatusFilter(status)
+                                        currentScreen = "operational_center"
+                                    },
+                                    onBackToHome = { currentScreen = "home" }
+                                )
+                            }
+                            "operational_center" -> {
+                                OperationalCenterScreen(
+                                    viewModel = operationalCenterViewModel,
+                                    userProfile = profile,
+                                    onOpenRequestDetail = { reqId ->
+                                        selectedConferenceRequestId = reqId
+                                        conferenceSourceScreen = "operational_center"
+                                        conferenceReadOnly = true
+                                        currentScreen = "conference_detail"
+                                    },
+                                    onOpenConferenceDetail = { reqId ->
+                                        selectedConferenceRequestId = reqId
+                                        conferenceSourceScreen = "operational_center"
+                                        conferenceReadOnly = false
+                                        currentScreen = "conference_detail"
+                                    },
+                                    onBackToHome = { currentScreen = "home" }
+                                )
+                            }
+                            "products" -> {
+                                androidx.compose.runtime.LaunchedEffect(profile) {
+                                    adminProductsViewModel.setUserProfile(profile)
+                                    adminProductsViewModel.refreshProducts()
+                                }
+                                AdminProductsScreen(
+                                    viewModel = adminProductsViewModel,
+                                    onBackToHome = { currentScreen = "home" },
+                                    userProfile = profile,
+                                    isAdmin = profile.role == UserRole.ADMIN,
+                                    onOpenScanner = {
+                                        scannerViewModel.tryAgain()
+                                        scannerSourceScreen = "products"
+                                        currentScreen = "scanner"
+                                    },
+                                    onOpenApprovals = {
+                                        currentScreen = "product_approval"
+                                    }
+                                )
+                            }
+                            "request_product" -> {
+                                RequestProductScreen(
+                                    viewModel = requestProductViewModel,
+                                    userProfile = profile,
+                                    onOpenScanner = {
+                                        scannerViewModel.tryAgain()
+                                        scannerSourceScreen = "request_product"
+                                        currentScreen = "scanner"
+                                    },
+                                    onBackToHome = { currentScreen = "home" }
+                                )
+                            }
+                            "product_approval" -> {
+                                val productApprovalViewModel: ProductApprovalViewModel = viewModel()
+                                ProductApprovalScreen(
+                                    viewModel = productApprovalViewModel,
+                                    userProfile = profile,
+                                    onBackToHome = { currentScreen = "home" }
+                                )
+                            }
+                            "history" -> {
+                                val historyViewModel: HistoryViewModel = viewModel()
+                                androidx.compose.runtime.LaunchedEffect(profile) {
+                                    historyViewModel.loadHistory(profile)
+                                }
+                                HistoryScreen(
+                                    viewModel = historyViewModel,
+                                    userProfile = profile,
+                                    onBackToHome = { currentScreen = "home" }
+                                )
+                            }
+                            "my_requests" -> {
+                                MyRequestsScreen(
+                                    userProfile = profile,
+                                    onNewRequest = {
+                                        newRequestSourceScreen = "my_requests"
+                                        currentScreen = "new_request"
+                                    },
+                                    onBackToHome = { currentScreen = "home" }
+                                )
+                            }
+                            "new_request" -> {
+                                NewRequestScreen(
+                                    viewModel = newRequestViewModel,
+                                    userProfile = profile,
+                                    onOpenScanner = {
+                                        scannerViewModel.tryAgain()
+                                        scannerSourceScreen = "new_request"
+                                        currentScreen = "scanner"
+                                    },
+                                    onBackToHome = { currentScreen = newRequestSourceScreen },
+                                    onRequestSubmitted = { currentScreen = "my_requests" }
+                                )
+                            }
+                            "pending_conferences" -> {
+                                PendingConferencesScreen(
+                                    userProfile = profile,
+                                    onOpenConferenceDetail = { reqId ->
+                                        selectedConferenceRequestId = reqId
+                                        conferenceSourceScreen = "pending_conferences"
+                                        conferenceReadOnly = false
+                                        currentScreen = "conference_detail"
+                                    },
+                                    onBackToHome = { currentScreen = "home" }
+                                )
+                            }
+                            "conference_detail" -> {
+                                val conferenceViewModel: ConferenceViewModel = viewModel()
+                                ConferenceDetailScreen(
+                                    requestId = selectedConferenceRequestId,
+                                    viewModel = conferenceViewModel,
+                                    userProfile = profile,
+                                    readOnlyView = conferenceReadOnly,
+                                    backButtonLabel = if (conferenceSourceScreen == "operational_center") {
+                                        "Voltar ao Centro Operacional"
+                                    } else {
+                                        "Voltar para Fila"
+                                    },
+                                    onBackToList = { currentScreen = conferenceSourceScreen }
+                                )
+                            }
+                            "scanner" -> {
+                                val isRegSource = scannerSourceScreen == "products" || scannerSourceScreen == "request_product"
+                                ScannerScreen(
+                                    viewModel = scannerViewModel,
+                                    onBackToHome = { currentScreen = scannerSourceScreen },
+                                    isForProductRegistration = isRegSource,
+                                    onProductSelected = { product ->
+                                        when (scannerSourceScreen) {
+                                            "products" -> {
+                                                if (!adminProductsViewModel.uiState.value.isCreatingProduct) {
+                                                    adminProductsViewModel.startCreatingProduct()
+                                                }
+                                                adminProductsViewModel.onNewBarcodeChanged(product.barcode)
+                                                if (product.name.isNotBlank()) {
+                                                    adminProductsViewModel.onNewNameChanged(product.name)
+                                                }
+                                                currentScreen = "products"
+                                            }
+                                            "request_product" -> {
+                                                requestProductViewModel.onBarcodeChanged(product.barcode)
+                                                if (product.name.isNotBlank()) {
+                                                    requestProductViewModel.onNameChanged(product.name)
+                                                }
+                                                currentScreen = "request_product"
+                                            }
+                                            else -> {
+                                                newRequestViewModel.onProductScannedOrSelected(product)
+                                                currentScreen = "new_request"
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                            else -> {
+                                HomeAuthenticatedScreen(
+                                    userProfile = profile,
+                                    onLogout = { loginViewModel.logout() },
+                                    onOpenNewRequest = {
+                                        newRequestSourceScreen = "home"
+                                        currentScreen = "new_request"
+                                    },
+                                    onOpenOperationalCenter = { currentScreen = "operational_center" },
+                                    onOpenReports = { currentScreen = "reports" },
+                                    onOpenAdminUsers = { currentScreen = "admin_users" },
+                                    onOpenStores = { currentScreen = "admin_stores" },
+                                    onOpenProducts = { currentScreen = "products" },
+                                    onOpenScanner = { currentScreen = "scanner" },
+                                    onOpenMyRequests = { currentScreen = "my_requests" },
+                                    onOpenConferences = { currentScreen = "pending_conferences" },
+                                    onOpenHistory = { currentScreen = "history" },
+                                    onOpenAuditLogs = { currentScreen = "admin_audit" },
+                                    onOpenRequestProduct = { currentScreen = "request_product" },
+                                    onOpenProductApproval = { currentScreen = "product_approval" },
+                                    updateUiState = updateUiState,
+                                    onCheckForUpdate = { appUpdateViewModel.checkManually() },
+                                    onUpdateNow = { appUpdateViewModel.onUpdateNow(this@MainActivity) },
+                                    onDismissUpdateBanner = { appUpdateViewModel.dismissBannerForLater() }
+                                )
+                            }
+                        }
                     }
                 }
             }

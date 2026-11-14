@@ -21,9 +21,9 @@ object ThemeManager {
         private set
 
     fun initialize(context: Context) {
-        val prefs = context.getSharedPreferences("queiroz_avaria_theme_prefs", Context.MODE_PRIVATE)
-        val modeStr = prefs.getString("theme_mode", AppThemeMode.SYSTEM.name) ?: AppThemeMode.SYSTEM.name
         val loadedMode = try {
+            val prefs = context.getSharedPreferences("queiroz_avaria_theme_prefs", Context.MODE_PRIVATE)
+            val modeStr = prefs.getString("theme_mode", AppThemeMode.SYSTEM.name) ?: AppThemeMode.SYSTEM.name
             AppThemeMode.valueOf(modeStr)
         } catch (_: Exception) {
             AppThemeMode.SYSTEM
@@ -65,10 +65,13 @@ object ThemeManager {
             }
         }
         context?.let {
-            it.getSharedPreferences("queiroz_avaria_theme_prefs", Context.MODE_PRIVATE)
-                .edit()
-                .putString("theme_mode", mode.name)
-                .apply()
+            try {
+                it.getSharedPreferences("queiroz_avaria_theme_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .putString("theme_mode", mode.name)
+                    .apply()
+            } catch (_: Exception) {
+            }
         }
     }
 

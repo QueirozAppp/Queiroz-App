@@ -56,10 +56,14 @@ class LoginViewModel(
     private var applicationContext: Context? = null
 
     fun loadDiagnostics(context: Context) {
-        applicationContext = context.applicationContext
+        applicationContext = context.applicationContext ?: context
         val info = FirebaseProvider.getDiagnosticInfo(context)
-        val prefs = context.getSharedPreferences("qrz_stock_auth_prefs", Context.MODE_PRIVATE)
-        val savedEmail = prefs.getString("last_email", "") ?: ""
+        val savedEmail = try {
+            val prefs = context.getSharedPreferences("qrz_stock_auth_prefs", Context.MODE_PRIVATE)
+            prefs.getString("last_email", "") ?: ""
+        } catch (_: Exception) {
+            ""
+        }
         _uiState.update { current ->
             current.copy(
                 diagnosticInfo = info,

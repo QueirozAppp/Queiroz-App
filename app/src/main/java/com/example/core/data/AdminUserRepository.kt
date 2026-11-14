@@ -48,19 +48,28 @@ class AdminUserRepository(
             android.util.Log.d("AdminUserRepository", "Listener Auth State: ${currentUser.email ?: "NULL"} (UID: ${currentUser.uid})")
             android.util.Log.d("AdminUserRepository", "Firestore Path: ${db.collection("users").path}")
 
-            val listener = db.collection("users")
-                .addSnapshotListener { snapshot, error ->
-                    if (error != null) {
-                        android.util.Log.w("AdminUserRepository", "Erro no listener de users: ${error.message}")
-                        return@addSnapshotListener
+            val listener = try {
+                db.collection("users")
+                    .addSnapshotListener { snapshot, error ->
+                        if (error != null) {
+                            android.util.Log.w("AdminUserRepository", "Erro no listener de users: ${error.message}")
+                            return@addSnapshotListener
+                        }
+                        val list = snapshot?.documents?.mapNotNull { doc ->
+                            try {
+                                UserProfile.fromDocument(doc)
+                            } catch (_: Exception) {
+                                null
+                            }
+                        } ?: emptyList()
+                        trySend(list)
                     }
-                    val list = snapshot?.documents?.map { doc ->
-                        UserProfile.fromDocument(doc)
-                    } ?: emptyList()
-                    trySend(list)
-                }
+            } catch (_: Exception) {
+                trySend(emptyList())
+                null
+            }
 
-            awaitClose { listener.remove() }
+            awaitClose { listener?.remove() }
         }
 
     /**
@@ -80,8 +89,12 @@ class AdminUserRepository(
             } ?: return Result.failure(IllegalStateException("Tempo limite ao consultar usuários no Firestore."))
             android.util.Log.i("AdminUserRepository", "LISTA_ATUALIZADA: ${querySnapshot.size()}")
 
-            val users = querySnapshot.documents.map { doc ->
-                UserProfile.fromDocument(doc)
+            val users = querySnapshot.documents.mapNotNull { doc ->
+                try {
+                    UserProfile.fromDocument(doc)
+                } catch (_: Exception) {
+                    null
+                }
             }.toMutableList()
 
             // Se o admin geral estiver autenticado e ainda não estiver na lista do Firestore, inclui e persiste

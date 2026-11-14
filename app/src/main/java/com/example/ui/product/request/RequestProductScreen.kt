@@ -837,7 +837,7 @@ private fun MyRequestItemCard(request: ProductRegistrationRequest) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Unidade: ${request.unit}" + if (request.price > 0.0) " • R$ ${String.format("%.2f", request.price)}" else "",
+                    text = "Unidade: ${request.unit}" + if (request.price > 0.0) " • R$ ${String.format(java.util.Locale.getDefault(), "%.2f", request.price)}" else "",
                     style = MaterialTheme.typography.bodySmall,
                     color = AppColors.TextSecondary
                 )

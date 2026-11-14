@@ -52,7 +52,7 @@ class ProductApprovalViewModel(
                 adjustedBarcode = request.barcode,
                 adjustedName = request.name,
                 adjustedUnit = request.unit,
-                adjustedPrice = if (request.price > 0.0) String.format("%.2f", request.price) else "",
+                adjustedPrice = if (request.price > 0.0) String.format(java.util.Locale.getDefault(), "%.2f", request.price) else "",
                 errorMessage = null
             )
         }

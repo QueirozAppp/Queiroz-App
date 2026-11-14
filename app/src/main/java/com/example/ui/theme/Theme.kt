@@ -6,6 +6,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import com.example.ui.components.AppColors
 
@@ -57,8 +58,12 @@ fun MyApplicationTheme(
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    // Keep AppColors tokens synchronized with active theme
-    AppColors.isDark = darkTheme
+    // Keep AppColors tokens synchronized with active theme safely outside composition
+    SideEffect {
+        if (AppColors.isDark != darkTheme) {
+            AppColors.isDark = darkTheme
+        }
+    }
 
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
 

@@ -69,7 +69,10 @@ fun MyRequestsScreen(
     modifier: Modifier = Modifier
 ) {
     val repository = remember { WithdrawalRequestRepository() }
-    val requests by repository.getMyRequestsFlow(userProfile.uid).collectAsState(initial = emptyList())
+    val myRequestsFlow = remember(userProfile.uid) {
+        repository.getMyRequestsFlow(userProfile.uid)
+    }
+    val requests by myRequestsFlow.collectAsState(initial = emptyList())
 
     val dateFormatter = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
 

@@ -82,7 +82,9 @@ class AuthRepository {
                     null
                 }
 
-                val existing = if (existingDoc != null && existingDoc.exists()) existingDoc.toObject(UserProfile::class.java) else null
+                val existing = if (existingDoc != null && existingDoc.exists()) {
+                    try { UserProfile.fromDocument(existingDoc) } catch (_: Exception) { null }
+                } else null
 
                 val primaryAdminData = hashMapOf<String, Any>(
                     "uid" to realUid,
@@ -432,8 +434,11 @@ class AuthRepository {
                 }
             }
             if (docSnap != null && docSnap.exists()) {
-                val profile = docSnap.toObject(UserProfile::class.java)?.copy(uid = uid)
-                    ?: return Result.failure(SecurityException("Erro ao processar dados do perfil."))
+                val profile = try {
+                    UserProfile.fromDocument(docSnap).copy(uid = uid)
+                } catch (_: Exception) {
+                    null
+                } ?: return Result.failure(SecurityException("Erro ao processar dados do perfil."))
                 Result.success(profile)
             } else {
                 Result.failure(SecurityException("Perfil não encontrado na coleção 'users'."))

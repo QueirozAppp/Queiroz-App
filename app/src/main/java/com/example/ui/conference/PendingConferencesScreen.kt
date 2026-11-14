@@ -69,7 +69,10 @@ fun PendingConferencesScreen(
     modifier: Modifier = Modifier
 ) {
     val repository = remember { WithdrawalRequestRepository() }
-    val requests by repository.getPendingConferencesFlow(userProfile.storeId).collectAsState(initial = emptyList())
+    val pendingFlow = remember(userProfile.storeId) {
+        repository.getPendingConferencesFlow(userProfile.storeId)
+    }
+    val requests by pendingFlow.collectAsState(initial = emptyList())
 
     val dateFormatter = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
 

@@ -42,26 +42,35 @@ class WithdrawalRequestRepository(
      */
     fun getMyRequestsFlow(uid: String): Flow<List<WithdrawalRequest>> = callbackFlow {
         val db = firestore
-        if (db == null || uid.isBlank()) {
+        if (db == null || uid.isBlank() || FirebaseProvider.getAuthOrNull()?.currentUser == null) {
             trySend(emptyList())
             close()
             return@callbackFlow
         }
 
-        val listener = db.collection("withdrawalRequests")
-            .whereEqualTo("requestedBy", uid)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    trySend(emptyList())
-                    return@addSnapshotListener
+        val listener = try {
+            db.collection("withdrawalRequests")
+                .whereEqualTo("requestedBy", uid)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        trySend(emptyList())
+                        return@addSnapshotListener
+                    }
+                    val list = snapshot?.documents?.mapNotNull { doc ->
+                        try {
+                            doc.toObject(WithdrawalRequest::class.java)?.copy(id = doc.id)
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }?.sortedByDescending { it.createdAt } ?: emptyList()
+                    trySend(list)
                 }
-                val list = snapshot?.documents?.mapNotNull { doc ->
-                    doc.toObject(WithdrawalRequest::class.java)?.copy(id = doc.id)
-                }?.sortedByDescending { it.createdAt } ?: emptyList()
-                trySend(list)
-            }
+        } catch (_: Exception) {
+            trySend(emptyList())
+            null
+        }
 
-        awaitClose { listener.remove() }
+        awaitClose { listener?.remove() }
     }
 
     /**
@@ -70,27 +79,36 @@ class WithdrawalRequestRepository(
      */
     fun getPendingConferencesFlow(storeId: String): Flow<List<WithdrawalRequest>> = callbackFlow {
         val db = firestore
-        if (db == null || storeId.isBlank()) {
+        if (db == null || storeId.isBlank() || FirebaseProvider.getAuthOrNull()?.currentUser == null) {
             trySend(emptyList())
             close()
             return@callbackFlow
         }
 
-        val listener = db.collection("withdrawalRequests")
-            .whereEqualTo("storeId", storeId)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    trySend(emptyList())
-                    return@addSnapshotListener
+        val listener = try {
+            db.collection("withdrawalRequests")
+                .whereEqualTo("storeId", storeId)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        trySend(emptyList())
+                        return@addSnapshotListener
+                    }
+                    val list = snapshot?.documents?.mapNotNull { doc ->
+                        try {
+                            doc.toObject(WithdrawalRequest::class.java)?.copy(id = doc.id)
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }?.filter { it.status == "PENDING" || it.status == "IN_CONFERENCE" }
+                        ?.sortedBy { it.createdAt } ?: emptyList()
+                    trySend(list)
                 }
-                val list = snapshot?.documents?.mapNotNull { doc ->
-                    doc.toObject(WithdrawalRequest::class.java)?.copy(id = doc.id)
-                }?.filter { it.status == "PENDING" || it.status == "IN_CONFERENCE" }
-                    ?.sortedBy { it.createdAt } ?: emptyList()
-                trySend(list)
-            }
+        } catch (_: Exception) {
+            trySend(emptyList())
+            null
+        }
 
-        awaitClose { listener.remove() }
+        awaitClose { listener?.remove() }
     }
 
     /**
@@ -98,7 +116,7 @@ class WithdrawalRequestRepository(
      */
     fun getSummaryFlow(userProfile: UserProfile): Flow<RequestStatusCounts> = callbackFlow {
         val db = firestore
-        if (db == null) {
+        if (db == null || FirebaseProvider.getAuthOrNull()?.currentUser == null) {
             trySend(RequestStatusCounts())
             close()
             return@callbackFlow
@@ -111,38 +129,47 @@ class WithdrawalRequestRepository(
             UserRole.ADMIN -> { /* Acompanhamento global para Admin */ }
         }
 
-        val listener = query.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                trySend(RequestStatusCounts())
-                return@addSnapshotListener
-            }
-            val docs = snapshot?.documents ?: emptyList()
-            var pending = 0L
-            var inConf = 0L
-            var completed = 0L
-            var divergence = 0L
+        val listener = try {
+            query.addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    trySend(RequestStatusCounts())
+                    return@addSnapshotListener
+                }
+                try {
+                    val docs = snapshot?.documents ?: emptyList()
+                    var pending = 0L
+                    var inConf = 0L
+                    var completed = 0L
+                    var divergence = 0L
 
-            for (doc in docs) {
-                when (doc.getString("status")) {
-                    "PENDING" -> pending++
-                    "IN_CONFERENCE" -> inConf++
-                    "COMPLETED" -> completed++
-                    "DIVERGENCE" -> divergence++
+                    for (doc in docs) {
+                        when (doc.getString("status")) {
+                            "PENDING" -> pending++
+                            "IN_CONFERENCE" -> inConf++
+                            "COMPLETED" -> completed++
+                            "DIVERGENCE" -> divergence++
+                        }
+                    }
+
+                    trySend(
+                        RequestStatusCounts(
+                            totalCount = docs.size.toLong(),
+                            pendingCount = pending,
+                            inConferenceCount = inConf,
+                            completedCount = completed,
+                            divergenceCount = divergence
+                        )
+                    )
+                } catch (_: Exception) {
+                    trySend(RequestStatusCounts())
                 }
             }
-
-            trySend(
-                RequestStatusCounts(
-                    totalCount = docs.size.toLong(),
-                    pendingCount = pending,
-                    inConferenceCount = inConf,
-                    completedCount = completed,
-                    divergenceCount = divergence
-                )
-            )
+        } catch (_: Exception) {
+            trySend(RequestStatusCounts())
+            null
         }
 
-        awaitClose { listener.remove() }
+        awaitClose { listener?.remove() }
     }
 
     /**
@@ -332,27 +359,36 @@ class WithdrawalRequestRepository(
      */
     fun getConferenceEvidencesFlow(requestId: String): Flow<List<ConferenceEvidence>> = callbackFlow {
         val db = firestore
-        if (db == null || requestId.isBlank()) {
+        if (db == null || requestId.isBlank() || FirebaseProvider.getAuthOrNull()?.currentUser == null) {
             trySend(emptyList())
             close()
             return@callbackFlow
         }
 
-        val listener = db.collection("withdrawalRequests")
-            .document(requestId)
-            .collection("evidence")
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    trySend(emptyList())
-                    return@addSnapshotListener
+        val listener = try {
+            db.collection("withdrawalRequests")
+                .document(requestId)
+                .collection("evidence")
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        trySend(emptyList())
+                        return@addSnapshotListener
+                    }
+                    val list = snapshot?.documents?.mapNotNull { doc ->
+                        try {
+                            doc.toObject(ConferenceEvidence::class.java)?.copy(id = doc.id)
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }?.sortedByDescending { it.createdAt } ?: emptyList()
+                    trySend(list)
                 }
-                val list = snapshot?.documents?.mapNotNull { doc ->
-                    doc.toObject(ConferenceEvidence::class.java)?.copy(id = doc.id)
-                }?.sortedByDescending { it.createdAt } ?: emptyList()
-                trySend(list)
-            }
+        } catch (_: Exception) {
+            trySend(emptyList())
+            null
+        }
 
-        awaitClose { listener.remove() }
+        awaitClose { listener?.remove() }
     }
 
     /**
@@ -596,7 +632,11 @@ class WithdrawalRequestRepository(
             }
 
             val list = snapshot.documents.mapNotNull { doc ->
-                doc.toObject(WithdrawalRequest::class.java)?.copy(id = doc.id)
+                try {
+                    doc.toObject(WithdrawalRequest::class.java)?.copy(id = doc.id)
+                } catch (_: Exception) {
+                    null
+                }
             }.sortedByDescending { it.createdAt }
 
             Result.success(list)
@@ -642,7 +682,11 @@ class WithdrawalRequestRepository(
                 .await()
 
             var list = snapshot.documents.mapNotNull { doc ->
-                doc.toObject(WithdrawalRequest::class.java)?.copy(id = doc.id)
+                try {
+                    doc.toObject(WithdrawalRequest::class.java)?.copy(id = doc.id)
+                } catch (_: Exception) {
+                    null
+                }
             }
 
             if (!filterSectorId.isNullOrBlank() && filterSectorId != "ALL") {
@@ -669,7 +713,11 @@ class WithdrawalRequestRepository(
 
                 val fallbackSnapshot = fallbackQuery.limit(limitCount * 2).get().await()
                 var list = fallbackSnapshot.documents.mapNotNull { doc ->
-                    doc.toObject(WithdrawalRequest::class.java)?.copy(id = doc.id)
+                    try {
+                        doc.toObject(WithdrawalRequest::class.java)?.copy(id = doc.id)
+                    } catch (_: Exception) {
+                        null
+                    }
                 }
 
                 if (!filterStatus.isNullOrBlank() && filterStatus != "ALL") {

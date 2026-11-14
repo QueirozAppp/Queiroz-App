@@ -552,7 +552,7 @@ private fun ApprovalItemCard(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Unidade: ${request.unit}" + if (request.price > 0.0) " • R$ ${String.format("%.2f", request.price)}" else "",
+                        text = "Unidade: ${request.unit}" + if (request.price > 0.0) " • R$ ${String.format(java.util.Locale.getDefault(), "%.2f", request.price)}" else "",
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.SemiBold,
                         color = AppColors.Primary

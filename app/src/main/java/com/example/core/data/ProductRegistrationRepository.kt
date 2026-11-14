@@ -7,7 +7,6 @@ import com.example.core.model.ProductRegistrationRequest
 import com.example.core.model.ProductRequestStatus
 import com.example.core.model.UserProfile
 import com.example.core.model.UserRole
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
@@ -116,7 +115,7 @@ class ProductRegistrationRepository(
      */
     suspend fun submitRequest(request: ProductRegistrationRequest): Result<String> {
         val db = firestore ?: return Result.failure(IllegalStateException("Firestore não inicializado."))
-        if (FirebaseAuth.getInstance().currentUser == null) {
+        if (FirebaseProvider.getAuthOrNull()?.currentUser == null) {
             return Result.failure(IllegalStateException("Sessão expirada. Faça login novamente."))
         }
 
@@ -332,7 +331,7 @@ class ProductRegistrationRepository(
         filterStatus: String? = null
     ): Flow<List<ProductRegistrationRequest>> = callbackFlow {
         val db = firestore
-        if (db == null || FirebaseAuth.getInstance().currentUser == null) {
+        if (db == null || FirebaseProvider.getAuthOrNull()?.currentUser == null) {
             trySend(filterByRole(memoryCache, userProfile, filterStatus))
             close()
             return@callbackFlow
@@ -400,7 +399,7 @@ class ProductRegistrationRepository(
      */
     fun getPendingCountFlow(userProfile: UserProfile): Flow<Int> = callbackFlow {
         val db = firestore
-        if (db == null || FirebaseAuth.getInstance().currentUser == null || userProfile.role == UserRole.SETOR_LEADER) {
+        if (db == null || FirebaseProvider.getAuthOrNull()?.currentUser == null || userProfile.role == UserRole.SETOR_LEADER) {
             trySend(0)
             close()
             return@callbackFlow

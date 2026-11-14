@@ -5,7 +5,6 @@ import com.example.core.model.AuditAction
 import com.example.core.model.AuditEntityType
 import com.example.core.model.Sector
 import com.example.core.model.Store
-import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -32,20 +31,29 @@ class StoreSectorRepository(
             return@callbackFlow
         }
 
-        val listener = db.collection("stores")
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    trySend(emptyList())
-                    return@addSnapshotListener
+        val listener = try {
+            db.collection("stores")
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        trySend(emptyList())
+                        return@addSnapshotListener
+                    }
+                    val list = snapshot?.documents?.mapNotNull { doc ->
+                        try {
+                            doc.toObject(Store::class.java)?.copy(id = doc.id)
+                        } catch (_: Exception) {
+                            null
+                        }
+                    } ?: emptyList()
+
+                    trySend(list.sortedBy { it.name })
                 }
-                val list = snapshot?.documents?.mapNotNull { doc ->
-                    doc.toObject(Store::class.java)?.copy(id = doc.id)
-                } ?: emptyList()
+        } catch (_: Exception) {
+            trySend(emptyList())
+            null
+        }
 
-                trySend(list.sortedBy { it.name })
-            }
-
-        awaitClose { listener.remove() }
+        awaitClose { listener?.remove() }
     }
 
     /**
@@ -59,21 +67,30 @@ class StoreSectorRepository(
             return@callbackFlow
         }
 
-        val listener = db.collection("sectors")
-            .whereEqualTo("storeId", storeId)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    trySend(emptyList())
-                    return@addSnapshotListener
+        val listener = try {
+            db.collection("sectors")
+                .whereEqualTo("storeId", storeId)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        trySend(emptyList())
+                        return@addSnapshotListener
+                    }
+                    val list = snapshot?.documents?.mapNotNull { doc ->
+                        try {
+                            doc.toObject(Sector::class.java)?.copy(id = doc.id)
+                        } catch (_: Exception) {
+                            null
+                        }
+                    } ?: emptyList()
+
+                    trySend(list.sortedBy { it.name })
                 }
-                val list = snapshot?.documents?.mapNotNull { doc ->
-                    doc.toObject(Sector::class.java)?.copy(id = doc.id)
-                } ?: emptyList()
+        } catch (_: Exception) {
+            trySend(emptyList())
+            null
+        }
 
-                trySend(list.sortedBy { it.name })
-            }
-
-        awaitClose { listener.remove() }
+        awaitClose { listener?.remove() }
     }
 
     suspend fun saveStore(store: Store): Result<Unit> {
@@ -103,7 +120,7 @@ class StoreSectorRepository(
 
             // Registro de auditoria assíncrono (não bloqueia a resposta)
             try {
-                val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: "admin_system"
+                val currentUid = FirebaseProvider.getAuthOrNull()?.currentUser?.uid ?: "admin_system"
                 val isNew = store.id.isBlank() || store.createdAt == 0L
                 val action = if (isNew) AuditAction.STORE_CREATED else if (!finalStore.active) AuditAction.STORE_DEACTIVATED else AuditAction.STORE_UPDATED
                 auditRepository.logEvent(
@@ -144,7 +161,7 @@ class StoreSectorRepository(
             }
 
             try {
-                val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: "admin_system"
+                val currentUid = FirebaseProvider.getAuthOrNull()?.currentUser?.uid ?: "admin_system"
                 val isNew = sector.id.isBlank() || sector.createdAt == 0L
                 val action = if (isNew) AuditAction.SECTOR_CREATED else if (!finalSector.active) AuditAction.SECTOR_DEACTIVATED else AuditAction.SECTOR_UPDATED
                 auditRepository.logEvent(
@@ -192,7 +209,7 @@ class StoreSectorRepository(
                 db.collection("sectors").document(doc.id).delete().await()
             }
             
-            val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: "admin_system"
+            val currentUid = FirebaseProvider.getAuthOrNull()?.currentUser?.uid ?: "admin_system"
             auditRepository.logEvent(
                 action = AuditAction.STORE_DELETED,
                 entityType = AuditEntityType.STORE,

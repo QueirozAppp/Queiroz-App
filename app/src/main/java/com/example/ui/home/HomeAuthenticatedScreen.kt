@@ -72,12 +72,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.core.model.UserProfile
 import com.example.core.model.UserRole
+import com.example.core.update.AppUpdateUiState
 import com.example.ui.components.AppColors
 import com.example.ui.components.AppMetricCard
 import com.example.ui.components.AppOutlinedButton
 import com.example.ui.components.AppPrimaryButton
 import com.example.ui.components.AppSectionHeader
 import com.example.ui.theme.ThemeManager
+import com.example.ui.update.AppUpdateBanner
+import com.example.ui.update.CheckUpdateSectionCard
 
 /**
  * Tela inicial contextual por perfil operacional redesenhada (Etapa 20).
@@ -101,13 +104,23 @@ fun HomeAuthenticatedScreen(
     onOpenAuditLogs: (() -> Unit)? = null,
     onOpenRequestProduct: (() -> Unit)? = null,
     onOpenProductApproval: (() -> Unit)? = null,
+    updateUiState: AppUpdateUiState = AppUpdateUiState(),
+    onCheckForUpdate: (() -> Unit)? = null,
+    onUpdateNow: (() -> Unit)? = null,
+    onDismissUpdateBanner: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val withdrawalRepo = remember { WithdrawalRequestRepository() }
     val productRegRepo = remember { ProductRegistrationRepository() }
-    val summaryCounts by withdrawalRepo.getSummaryFlow(userProfile).collectAsState(initial = RequestStatusCounts())
-    val pendingProductRequestsCount by productRegRepo.getPendingCountFlow(userProfile).collectAsState(initial = 0)
+    val summaryFlow = remember(userProfile.uid, userProfile.role, userProfile.storeId) {
+        withdrawalRepo.getSummaryFlow(userProfile)
+    }
+    val pendingProductRequestsFlow = remember(userProfile.uid, userProfile.role, userProfile.storeId) {
+        productRegRepo.getPendingCountFlow(userProfile)
+    }
+    val summaryCounts by summaryFlow.collectAsState(initial = RequestStatusCounts())
+    val pendingProductRequestsCount by pendingProductRequestsFlow.collectAsState(initial = 0)
 
     val historyButtonLabel = when (userProfile.role) {
         UserRole.ADMIN -> "Histórico Geral de Baixas"
@@ -207,6 +220,15 @@ fun HomeAuthenticatedScreen(
                     .widthIn(max = 560.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // Aviso discreto de nova versão disponível
+                if (updateUiState.showBanner && updateUiState.availableUpdate != null) {
+                    AppUpdateBanner(
+                        updateInfo = updateUiState.availableUpdate,
+                        onUpdateClick = { onUpdateNow?.invoke() },
+                        onLaterClick = { onDismissUpdateBanner?.invoke() }
+                    )
+                }
+
                 // Header Card com Identificação Contextual Glassmorphic (Estilo App Financeiro Premium)
                 Card(
                     colors = CardDefaults.cardColors(containerColor = AppColors.Surface.copy(alpha = 0.85f)),
@@ -649,6 +671,16 @@ fun HomeAuthenticatedScreen(
                         ProfileInfoRow(label = "Status da Conta:", value = if (userProfile.active) "Ativo" else "Inativo")
                         ProfileInfoRow(label = "Perfil:", value = userProfile.role.label)
                     }
+                }
+
+                // Cartão de Verificação de Atualização do Aplicativo
+                if (onCheckForUpdate != null) {
+                    CheckUpdateSectionCard(
+                        isChecking = updateUiState.isChecking,
+                        statusMessage = updateUiState.statusMessage,
+                        isStatusError = updateUiState.isStatusError,
+                        onCheckForUpdateClick = onCheckForUpdate
+                    )
                 }
             }
         }
