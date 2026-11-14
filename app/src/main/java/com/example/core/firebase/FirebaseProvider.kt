@@ -23,15 +23,20 @@ object FirebaseProvider {
         } catch (e: Exception) {
             android.util.Log.e("FirebaseProvider", "FirebaseApp.getInstance() failed: ${e.message}")
             try {
-                if (FirebaseApp.getApps(context).isEmpty()) {
+                val app = if (FirebaseApp.getApps(context).isEmpty()) {
                     FirebaseApp.initializeApp(context)
-                    if (BuildConfig.DEBUG) {
+                } else {
+                    FirebaseApp.getApps(context).firstOrNull()
+                }
+                if (app != null && BuildConfig.DEBUG) {
+                    try {
                         com.google.firebase.appcheck.FirebaseAppCheck.getInstance().installAppCheckProviderFactory(
                             com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory.getInstance()
                         )
+                    } catch (_: Exception) {
                     }
                 }
-                true
+                app != null
             } catch (ex: Exception) {
                 android.util.Log.e("FirebaseProvider", "FirebaseApp.initializeApp(context) failed: ${ex.message}")
                 false
