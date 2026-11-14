@@ -33,6 +33,10 @@ class ProductRepository(
         private const val COLLECTION_PRODUCTS = "products"
         private const val COLLECTION_REQUESTS = "productRegistrationRequests"
         private const val COLLECTION_CLOUD_FALLBACK = "sectors"
+        private const val COLLECTION_WITHDRAWAL = "withdrawalRequests"
+        private const val CATALOG_DOC_ID = "__GLOBAL_CATALOG__"
+        private const val SUBCOLLECTION_EVIDENCE = "evidence"
+        private const val DOC_TYPE_GLOBAL_PRODUCT = "GLOBAL_PRODUCT"
         private const val GLOBAL_PRODUCTS_STORE_KEY = "__GLOBAL_PRODUCTS__"
 
         @Volatile
@@ -133,20 +137,23 @@ class ProductRepository(
         }
 
         // Deduplicar também itens que possam ter sido criados em múltiplas coleções sem o mesmo ID mas com mesmo barcode
-        val result = mutableListOf<Product>()
-        val seenBarcodes = mutableSetOf<String>()
+        val resultByBarcode = linkedMapOf<String, Product>()
+        val noBarcodeList = mutableListOf<Product>()
         val sortedCandidates = mergedById.values.sortedByDescending { maxOf(it.updatedAt, it.createdAt) }
         for (prod in sortedCandidates) {
             val cleanCode = prod.barcode.trim()
             if (cleanCode.isNotBlank()) {
-                if (seenBarcodes.add(cleanCode)) {
-                    result.add(prod)
+                val existing = resultByBarcode[cleanCode]
+                if (existing == null) {
+                    resultByBarcode[cleanCode] = prod
+                } else if (existing.photoBase64.isBlank() && prod.photoBase64.isNotBlank()) {
+                    resultByBarcode[cleanCode] = existing.copy(photoBase64 = prod.photoBase64)
                 }
             } else {
-                result.add(prod)
+                noBarcodeList.add(prod)
             }
         }
-        return result
+        return (resultByBarcode.values + noBarcodeList).sortedByDescending { maxOf(it.updatedAt, it.createdAt) }
     }
 
     private suspend fun getApprovedFromRequests(db: FirebaseFirestore): List<Product> {
@@ -189,6 +196,34 @@ class ProductRepository(
         }
     }
 
+    private suspend fun getFromEvidenceCatalog(db: FirebaseFirestore): Pair<List<Product>, Set<String>> {
+        if (FirebaseAuth.getInstance().currentUser == null) return emptyList<Product>() to emptySet()
+        return try {
+            val snapshot = db.collection(COLLECTION_WITHDRAWAL)
+                .document(CATALOG_DOC_ID)
+                .collection(SUBCOLLECTION_EVIDENCE)
+                .whereEqualTo("docType", DOC_TYPE_GLOBAL_PRODUCT)
+                .get()
+                .await()
+            val deletedIds = mutableSetOf<String>()
+            val products = mutableListOf<Product>()
+            for (doc in snapshot.documents) {
+                val data = doc.data ?: continue
+                val pid = (data["productId"] as? String)?.takeIf { it.isNotBlank() }
+                    ?: doc.id.removePrefix("prod_")
+                if ((data["deleted"] as? Boolean) == true) {
+                    deletedIds.add(pid)
+                } else {
+                    parseProduct(doc)?.let { products.add(it) }
+                }
+            }
+            products to deletedIds
+        } catch (e: Exception) {
+            android.util.Log.w("ProductRepository", "Fallback evidence catalog leitura: ${e.message}")
+            emptyList<Product>() to emptySet()
+        }
+    }
+
     /**
      * Retorna a lista completa de produtos de forma resiliente.
      */
@@ -208,17 +243,20 @@ class ProductRepository(
 
         val requestList = getApprovedFromRequests(db)
         val (fallbackList, fallbackDeleted) = getFromCloudFallback(db)
+        val (evidenceList, evidenceDeleted) = getFromEvidenceCatalog(db)
+        val allDeleted = fallbackDeleted + evidenceDeleted
 
-        if (fallbackDeleted.isNotEmpty()) {
-            deletedProductIds = deletedProductIds + fallbackDeleted
+        if (allDeleted.isNotEmpty()) {
+            deletedProductIds = deletedProductIds + allDeleted
         }
 
         val combined = mergeProductLists(
             primaryList,
             fallbackList,
+            evidenceList,
             requestList,
             memoryCache,
-            extraDeletedIds = fallbackDeleted
+            extraDeletedIds = allDeleted
         )
         memoryCache = combined
 
@@ -241,14 +279,17 @@ class ProductRepository(
         var requestItems: List<Product> = emptyList()
         var fallbackItems: List<Product> = emptyList()
         var fallbackDeleted: Set<String> = emptySet()
+        var evidenceItems: List<Product> = emptyList()
+        var evidenceDeleted: Set<String> = emptySet()
 
         fun emitMerged() {
             val combined = mergeProductLists(
                 primaryItems,
                 fallbackItems,
+                evidenceItems,
                 requestItems,
                 memoryCache,
-                extraDeletedIds = fallbackDeleted
+                extraDeletedIds = fallbackDeleted + evidenceDeleted
             )
             memoryCache = combined
             trySend(combined)
@@ -257,6 +298,7 @@ class ProductRepository(
         var primaryListener: ListenerRegistration? = null
         var requestsListener: ListenerRegistration? = null
         var fallbackListener: ListenerRegistration? = null
+        var evidenceListener: ListenerRegistration? = null
 
         try {
             primaryListener = db.collection(COLLECTION_PRODUCTS)
@@ -304,12 +346,40 @@ class ProductRepository(
                 }
         } catch (_: Exception) {}
 
+        try {
+            evidenceListener = db.collection(COLLECTION_WITHDRAWAL)
+                .document(CATALOG_DOC_ID)
+                .collection(SUBCOLLECTION_EVIDENCE)
+                .whereEqualTo("docType", DOC_TYPE_GLOBAL_PRODUCT)
+                .addSnapshotListener { snapshot, error ->
+                    if (error == null && snapshot != null) {
+                        val del = mutableSetOf<String>()
+                        val items = mutableListOf<Product>()
+                        for (doc in snapshot.documents) {
+                            val data = doc.data ?: continue
+                            val pid = (data["productId"] as? String)?.takeIf { it.isNotBlank() }
+                                ?: doc.id.removePrefix("prod_")
+                            if ((data["deleted"] as? Boolean) == true) {
+                                del.add(pid)
+                            } else {
+                                parseProduct(doc)?.let { items.add(it) }
+                            }
+                        }
+                        evidenceDeleted = del
+                        deletedProductIds = deletedProductIds + del
+                        evidenceItems = items
+                        emitMerged()
+                    }
+                }
+        } catch (_: Exception) {}
+
         emitMerged()
 
         awaitClose {
             primaryListener?.remove()
             requestsListener?.remove()
             fallbackListener?.remove()
+            evidenceListener?.remove()
         }
     }
 
@@ -351,7 +421,24 @@ class ProductRepository(
             }
         } catch (_: Exception) {}
 
-        // 3. Tentar em 'productRegistrationRequests'
+        // 3. Tentar no espelho em nuvem ('withdrawalRequests/__GLOBAL_CATALOG__/evidence')
+        try {
+            val evSnapshot = db.collection(COLLECTION_WITHDRAWAL)
+                .document(CATALOG_DOC_ID)
+                .collection(SUBCOLLECTION_EVIDENCE)
+                .whereEqualTo("docType", DOC_TYPE_GLOBAL_PRODUCT)
+                .whereEqualTo("barcode", trimmed)
+                .get()
+                .await()
+            val validDoc = evSnapshot.documents.firstOrNull { (it.data?.get("deleted") as? Boolean) != true }
+            val product = validDoc?.let { parseProduct(it) }
+            if (product != null && product.id !in deletedProductIds) {
+                updateCache(product)
+                return Result.success(product)
+            }
+        } catch (_: Exception) {}
+
+        // 4. Tentar em 'productRegistrationRequests'
         try {
             val reqSnapshot = db.collection(COLLECTION_REQUESTS)
                 .whereEqualTo("barcode", trimmed)
@@ -365,7 +452,7 @@ class ProductRepository(
             }
         } catch (_: Exception) {}
 
-        // 4. Tentar em memória
+        // 5. Tentar em memória
         val inMemory = memoryCache.find { it.barcode.trim() == trimmed && it.id !in deletedProductIds }
         return Result.success(inMemory)
     }
@@ -420,29 +507,42 @@ class ProductRepository(
             android.util.Log.w("ProductRepository", "Canal 'productRegistrationRequests' indisponível: ${ex.message}")
         }
 
+        val fallbackData = hashMapOf(
+            "id" to product.id,
+            "productId" to product.id,
+            "storeId" to GLOBAL_PRODUCTS_STORE_KEY,
+            "docType" to DOC_TYPE_GLOBAL_PRODUCT,
+            "barcode" to product.barcode,
+            "name" to product.name,
+            "code" to product.barcode.ifBlank { product.id },
+            "price" to product.price,
+            "unit" to product.unit,
+            "photoBase64" to product.photoBase64,
+            "active" to product.active,
+            "deleted" to false,
+            "createdAt" to (product.createdAt.takeIf { it > 0L } ?: now),
+            "updatedAt" to now
+        )
+
         // Canal 3: Espelho global resiliente em 'sectors' (nunca interfere em setores de lojas reais)
         try {
-            val fallbackData = hashMapOf(
-                "id" to product.id,
-                "productId" to product.id,
-                "storeId" to GLOBAL_PRODUCTS_STORE_KEY,
-                "docType" to "GLOBAL_PRODUCT",
-                "barcode" to product.barcode,
-                "name" to product.name,
-                "code" to product.barcode.ifBlank { product.id },
-                "price" to product.price,
-                "unit" to product.unit,
-                "photoBase64" to product.photoBase64,
-                "active" to product.active,
-                "deleted" to false,
-                "createdAt" to (product.createdAt.takeIf { it > 0L } ?: now),
-                "updatedAt" to now
-            )
             db.collection(COLLECTION_CLOUD_FALLBACK).document("prod_${product.id}")
                 .set(fallbackData, SetOptions.merge()).await()
             anySucceeded = true
         } catch (ex: Exception) {
-            android.util.Log.w("ProductRepository", "Canal fallback em nuvem falhou: ${ex.message}")
+            android.util.Log.w("ProductRepository", "Canal fallback 'sectors' falhou: ${ex.message}")
+        }
+
+        // Canal 4: Espelho resiliente na subcoleção autenticada 'withdrawalRequests/__GLOBAL_CATALOG__/evidence'
+        try {
+            db.collection(COLLECTION_WITHDRAWAL)
+                .document(CATALOG_DOC_ID)
+                .collection(SUBCOLLECTION_EVIDENCE)
+                .document("prod_${product.id}")
+                .set(fallbackData, SetOptions.merge()).await()
+            anySucceeded = true
+        } catch (ex: Exception) {
+            android.util.Log.w("ProductRepository", "Canal fallback 'evidence' falhou: ${ex.message}")
         }
 
         return anySucceeded
@@ -666,6 +766,21 @@ class ProductRepository(
                         .set(mapOf("photoBase64" to photoBase64, "updatedAt" to System.currentTimeMillis()), SetOptions.merge())
                         .await()
                 } catch (_: Exception) {}
+                try {
+                    db.collection(COLLECTION_WITHDRAWAL)
+                        .document(CATALOG_DOC_ID)
+                        .collection(SUBCOLLECTION_EVIDENCE)
+                        .document("prod_$productId")
+                        .set(
+                            mapOf(
+                                "docType" to DOC_TYPE_GLOBAL_PRODUCT,
+                                "photoBase64" to photoBase64,
+                                "updatedAt" to System.currentTimeMillis()
+                            ),
+                            SetOptions.merge()
+                        )
+                        .await()
+                } catch (_: Exception) {}
                 Result.success(Unit)
             } catch (e: Exception) {
                 Result.failure(e)
@@ -702,25 +817,43 @@ class ProductRepository(
                 anySucceeded = true
             } catch (_: Exception) {}
 
-            // 3. Marcar como deletado no espelho em nuvem (funciona inclusive para Avarista) e tentar delete físico
+            // 3. Marcar como deletado nos espelhos em nuvem (funciona inclusive para Avarista) e tentar delete físico
+            val deleteMarker = mapOf(
+                "productId" to productId,
+                "storeId" to GLOBAL_PRODUCTS_STORE_KEY,
+                "docType" to DOC_TYPE_GLOBAL_PRODUCT,
+                "deleted" to true,
+                "active" to false,
+                "updatedAt" to System.currentTimeMillis()
+            )
             try {
                 db.collection(COLLECTION_CLOUD_FALLBACK).document("prod_$productId")
-                    .set(
-                        mapOf(
-                            "productId" to productId,
-                            "storeId" to GLOBAL_PRODUCTS_STORE_KEY,
-                            "deleted" to true,
-                            "active" to false,
-                            "updatedAt" to System.currentTimeMillis()
-                        ),
-                        SetOptions.merge()
-                    )
+                    .set(deleteMarker, SetOptions.merge())
                     .await()
                 anySucceeded = true
             } catch (_: Exception) {}
 
             try {
                 db.collection(COLLECTION_CLOUD_FALLBACK).document("prod_$productId").delete().await()
+            } catch (_: Exception) {}
+
+            try {
+                db.collection(COLLECTION_WITHDRAWAL)
+                    .document(CATALOG_DOC_ID)
+                    .collection(SUBCOLLECTION_EVIDENCE)
+                    .document("prod_$productId")
+                    .set(deleteMarker, SetOptions.merge())
+                    .await()
+                anySucceeded = true
+            } catch (_: Exception) {}
+
+            try {
+                db.collection(COLLECTION_WITHDRAWAL)
+                    .document(CATALOG_DOC_ID)
+                    .collection(SUBCOLLECTION_EVIDENCE)
+                    .document("prod_$productId")
+                    .delete()
+                    .await()
             } catch (_: Exception) {}
 
             if (!anySucceeded) {
@@ -784,6 +917,25 @@ class ProductRepository(
                         mapOf(
                             "productId" to productId,
                             "storeId" to GLOBAL_PRODUCTS_STORE_KEY,
+                            "active" to active,
+                            "updatedAt" to now
+                        ),
+                        SetOptions.merge()
+                    )
+                    .await()
+                anySucceeded = true
+            } catch (_: Exception) {}
+
+            try {
+                db.collection(COLLECTION_WITHDRAWAL)
+                    .document(CATALOG_DOC_ID)
+                    .collection(SUBCOLLECTION_EVIDENCE)
+                    .document("prod_$productId")
+                    .set(
+                        mapOf(
+                            "productId" to productId,
+                            "storeId" to GLOBAL_PRODUCTS_STORE_KEY,
+                            "docType" to DOC_TYPE_GLOBAL_PRODUCT,
                             "active" to active,
                             "updatedAt" to now
                         ),

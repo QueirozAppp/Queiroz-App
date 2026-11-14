@@ -108,6 +108,26 @@ fun ScannerScreen(
         viewModel.onPermissionResult(granted)
     }
 
+    // Quando o scanner é aberto pela tela de cadastro/solicitação de produto,
+    // assim que um código novo é lido (não encontrado ou erro de rede na consulta),
+    // retorna imediatamente com o código preenchido sem exibir "Produto não cadastrado".
+    LaunchedEffect(
+        isForProductRegistration,
+        uiState.productNotFound,
+        uiState.errorMessage,
+        uiState.scannedBarcode
+    ) {
+        val code = uiState.scannedBarcode
+        if (isForProductRegistration &&
+            onProductSelected != null &&
+            !code.isNullOrBlank() &&
+            (uiState.productNotFound || !uiState.errorMessage.isNullOrEmpty())
+        ) {
+            viewModel.tryAgain()
+            onProductSelected(Product(barcode = code))
+        }
+    }
+
     Scaffold(
         modifier = modifier
             .fillMaxSize()
@@ -117,7 +137,7 @@ fun ScannerScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Leitor de Código de Barras",
+                        text = if (isForProductRegistration) "Ler Código para Cadastro" else "Leitor de Código de Barras",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = AppColors.TextPrimary
@@ -212,7 +232,7 @@ fun ScannerScreen(
                             strokeWidth = 3.dp
                         )
                         Text(
-                            text = "Buscando produto no catálogo central...",
+                            text = if (isForProductRegistration) "Verificando código de barras lido..." else "Buscando produto no catálogo central...",
                             style = MaterialTheme.typography.bodyMedium,
                             color = AppColors.TextSecondary
                         )
@@ -267,19 +287,22 @@ fun ScannerScreen(
                     )
                 } else if (uiState.productNotFound) {
                     if (isForProductRegistration && onProductSelected != null) {
-                        ResultCard(
-                            title = "Código Disponível para Cadastro",
-                            titleColor = AppColors.StatusCompletedText,
-                            containerBg = AppColors.StatusCompletedBg,
-                            icon = Icons.Default.CheckCircle,
-                            subtitle = "Código lido: ${uiState.scannedBarcode ?: ""}. Nenhum produto cadastrado com este código.",
-                            actionButtonText = "Usar Código no Cadastro",
-                            onAction = {
-                                onProductSelected.invoke(Product(barcode = uiState.scannedBarcode ?: ""))
-                            },
-                            secondaryActionButtonText = "Escanear Novamente",
-                            onSecondaryAction = viewModel::tryAgain
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(40.dp),
+                                color = AppColors.Primary,
+                                strokeWidth = 3.dp
+                            )
+                            Text(
+                                text = "Código ${uiState.scannedBarcode ?: ""} lido! Preenchendo cadastro...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = AppColors.TextSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     } else {
                         ResultCard(
                             title = "Produto não cadastrado",
@@ -297,15 +320,34 @@ fun ScannerScreen(
                         )
                     }
                 } else if (!uiState.errorMessage.isNullOrEmpty()) {
-                    ResultCard(
-                        title = "Erro na Leitura",
-                        titleColor = AppColors.StatusDivergenceText,
-                        containerBg = AppColors.StatusDivergenceBg,
-                        icon = Icons.Default.Error,
-                        subtitle = uiState.errorMessage,
-                        actionButtonText = "Tentar Novamente",
-                        onAction = viewModel::tryAgain
-                    )
+                    if (isForProductRegistration && onProductSelected != null && !uiState.scannedBarcode.isNullOrBlank()) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(40.dp),
+                                color = AppColors.Primary,
+                                strokeWidth = 3.dp
+                            )
+                            Text(
+                                text = "Preenchendo código ${uiState.scannedBarcode}...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = AppColors.TextSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    } else {
+                        ResultCard(
+                            title = "Erro na Leitura",
+                            titleColor = AppColors.StatusDivergenceText,
+                            containerBg = AppColors.StatusDivergenceBg,
+                            icon = Icons.Default.Error,
+                            subtitle = uiState.errorMessage,
+                            actionButtonText = "Tentar Novamente",
+                            onAction = viewModel::tryAgain
+                        )
+                    }
                 } else {
                     Column(
                         modifier = Modifier.fillMaxWidth(),

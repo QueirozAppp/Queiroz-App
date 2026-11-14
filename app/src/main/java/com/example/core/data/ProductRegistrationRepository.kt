@@ -31,6 +31,10 @@ class ProductRegistrationRepository(
     companion object {
         private const val COLLECTION_REQUESTS = "productRegistrationRequests"
         private const val COLLECTION_CLOUD_FALLBACK = "sectors"
+        private const val COLLECTION_WITHDRAWAL = "withdrawalRequests"
+        private const val CATALOG_DOC_ID = "__GLOBAL_CATALOG__"
+        private const val SUBCOLLECTION_EVIDENCE = "evidence"
+        private const val DOC_TYPE_REG_REQUEST = "PRODUCT_REQUEST"
         private const val REQUESTS_STORE_KEY = "__PRODUCT_REG_REQUESTS__"
 
         @Volatile
@@ -149,35 +153,49 @@ class ProductRegistrationRepository(
                 android.util.Log.w("ProductRegRepo", "Canal 'productRegistrationRequests' indisponível (${ex.message}), usando canal resiliente.")
             }
 
+            // Mapa espelho para canais resilientes
+            val mirrorMap = hashMapOf<String, Any>(
+                "id" to id,
+                "requestId" to id,
+                "storeId" to REQUESTS_STORE_KEY,
+                "originalStoreId" to finalRequest.storeId,
+                "docType" to DOC_TYPE_REG_REQUEST,
+                "code" to trimmedBarcode.ifBlank { id },
+                "barcode" to trimmedBarcode,
+                "name" to trimmedName,
+                "price" to finalRequest.price,
+                "unit" to finalRequest.unit,
+                "photoBase64" to finalRequest.photoBase64,
+                "sectorId" to finalRequest.sectorId,
+                "requestedByUid" to finalRequest.requestedByUid,
+                "requestedByName" to finalRequest.requestedByName,
+                "requestedAt" to now,
+                "status" to ProductRequestStatus.PENDING.name,
+                "rejectionReason" to "",
+                "reviewedByUid" to "",
+                "reviewedByName" to "",
+                "reviewedAt" to 0L
+            )
+
             // Canal 2: Espelho em nuvem seguro ('sectors' com storeId="__PRODUCT_REG_REQUESTS__")
             try {
-                val fallbackMap = hashMapOf<String, Any>(
-                    "id" to id,
-                    "requestId" to id,
-                    "storeId" to REQUESTS_STORE_KEY,
-                    "originalStoreId" to finalRequest.storeId,
-                    "docType" to "PRODUCT_REQUEST",
-                    "code" to trimmedBarcode.ifBlank { id },
-                    "barcode" to trimmedBarcode,
-                    "name" to trimmedName,
-                    "price" to finalRequest.price,
-                    "unit" to finalRequest.unit,
-                    "photoBase64" to finalRequest.photoBase64,
-                    "sectorId" to finalRequest.sectorId,
-                    "requestedByUid" to finalRequest.requestedByUid,
-                    "requestedByName" to finalRequest.requestedByName,
-                    "requestedAt" to now,
-                    "status" to ProductRequestStatus.PENDING.name,
-                    "rejectionReason" to "",
-                    "reviewedByUid" to "",
-                    "reviewedByName" to "",
-                    "reviewedAt" to 0L
-                )
                 db.collection(COLLECTION_CLOUD_FALLBACK).document("req_$id")
-                    .set(fallbackMap, SetOptions.merge()).await()
+                    .set(mirrorMap, SetOptions.merge()).await()
                 anySucceeded = true
             } catch (ex: Exception) {
-                android.util.Log.w("ProductRegRepo", "Canal fallback de solicitação falhou: ${ex.message}")
+                android.util.Log.w("ProductRegRepo", "Canal fallback 'sectors' falhou: ${ex.message}")
+            }
+
+            // Canal 3: Espelho resiliente na subcoleção autenticada 'withdrawalRequests/__GLOBAL_CATALOG__/evidence'
+            try {
+                db.collection(COLLECTION_WITHDRAWAL)
+                    .document(CATALOG_DOC_ID)
+                    .collection(SUBCOLLECTION_EVIDENCE)
+                    .document("req_$id")
+                    .set(mirrorMap, SetOptions.merge()).await()
+                anySucceeded = true
+            } catch (ex: Exception) {
+                android.util.Log.w("ProductRegRepo", "Canal fallback 'evidence' falhou: ${ex.message}")
             }
 
             if (!anySucceeded) {
@@ -245,31 +263,38 @@ class ProductRegistrationRepository(
         updateCache(entry)
 
         val db = firestore ?: return
+        val mirrorMap = hashMapOf<String, Any>(
+            "id" to productId,
+            "requestId" to productId,
+            "storeId" to REQUESTS_STORE_KEY,
+            "originalStoreId" to entry.storeId,
+            "docType" to DOC_TYPE_REG_REQUEST,
+            "code" to entry.barcode.ifBlank { productId },
+            "barcode" to entry.barcode,
+            "name" to entry.name,
+            "price" to entry.price,
+            "unit" to entry.unit,
+            "photoBase64" to entry.photoBase64,
+            "sectorId" to entry.sectorId,
+            "requestedByUid" to entry.requestedByUid,
+            "requestedByName" to entry.requestedByName,
+            "requestedAt" to now,
+            "status" to ProductRequestStatus.APPROVED.name,
+            "rejectionReason" to "",
+            "reviewedByUid" to entry.reviewedByUid,
+            "reviewedByName" to entry.reviewedByName,
+            "reviewedAt" to now
+        )
         try {
-            val fallbackMap = hashMapOf<String, Any>(
-                "id" to productId,
-                "requestId" to productId,
-                "storeId" to REQUESTS_STORE_KEY,
-                "originalStoreId" to entry.storeId,
-                "docType" to "PRODUCT_REQUEST",
-                "code" to entry.barcode.ifBlank { productId },
-                "barcode" to entry.barcode,
-                "name" to entry.name,
-                "price" to entry.price,
-                "unit" to entry.unit,
-                "photoBase64" to entry.photoBase64,
-                "sectorId" to entry.sectorId,
-                "requestedByUid" to entry.requestedByUid,
-                "requestedByName" to entry.requestedByName,
-                "requestedAt" to now,
-                "status" to ProductRequestStatus.APPROVED.name,
-                "rejectionReason" to "",
-                "reviewedByUid" to entry.reviewedByUid,
-                "reviewedByName" to entry.reviewedByName,
-                "reviewedAt" to now
-            )
             db.collection(COLLECTION_CLOUD_FALLBACK).document("req_$productId")
-                .set(fallbackMap, SetOptions.merge()).await()
+                .set(mirrorMap, SetOptions.merge()).await()
+        } catch (_: Exception) {}
+        try {
+            db.collection(COLLECTION_WITHDRAWAL)
+                .document(CATALOG_DOC_ID)
+                .collection(SUBCOLLECTION_EVIDENCE)
+                .document("req_$productId")
+                .set(mirrorMap, SetOptions.merge()).await()
         } catch (_: Exception) {}
     }
 
@@ -315,15 +340,17 @@ class ProductRegistrationRepository(
 
         var primaryItems: List<ProductRegistrationRequest> = emptyList()
         var fallbackItems: List<ProductRegistrationRequest> = emptyList()
+        var evidenceItems: List<ProductRegistrationRequest> = emptyList()
 
         fun emitMerged() {
-            val merged = mergeRequests(primaryItems, fallbackItems, memoryCache)
+            val merged = mergeRequests(primaryItems, fallbackItems, evidenceItems, memoryCache)
             memoryCache = merged
             trySend(filterByRole(merged, userProfile, filterStatus))
         }
 
         var primaryListener: ListenerRegistration? = null
         var fallbackListener: ListenerRegistration? = null
+        var evidenceListener: ListenerRegistration? = null
 
         try {
             primaryListener = db.collection(COLLECTION_REQUESTS)
@@ -346,11 +373,25 @@ class ProductRegistrationRepository(
                 }
         } catch (_: Exception) {}
 
+        try {
+            evidenceListener = db.collection(COLLECTION_WITHDRAWAL)
+                .document(CATALOG_DOC_ID)
+                .collection(SUBCOLLECTION_EVIDENCE)
+                .whereEqualTo("docType", DOC_TYPE_REG_REQUEST)
+                .addSnapshotListener { snapshot, error ->
+                    if (error == null && snapshot != null) {
+                        evidenceItems = snapshot.documents.mapNotNull { parseRequest(it) }
+                        emitMerged()
+                    }
+                }
+        } catch (_: Exception) {}
+
         emitMerged()
 
         awaitClose {
             primaryListener?.remove()
             fallbackListener?.remove()
+            evidenceListener?.remove()
         }
     }
 
@@ -367,15 +408,17 @@ class ProductRegistrationRepository(
 
         var primaryItems: List<ProductRegistrationRequest> = emptyList()
         var fallbackItems: List<ProductRegistrationRequest> = emptyList()
+        var evidenceItems: List<ProductRegistrationRequest> = emptyList()
 
         fun emitCount() {
-            val merged = mergeRequests(primaryItems, fallbackItems, memoryCache)
+            val merged = mergeRequests(primaryItems, fallbackItems, evidenceItems, memoryCache)
             val filtered = filterByRole(merged, userProfile, ProductRequestStatus.PENDING.name)
             trySend(filtered.size)
         }
 
         var primaryListener: ListenerRegistration? = null
         var fallbackListener: ListenerRegistration? = null
+        var evidenceListener: ListenerRegistration? = null
 
         try {
             primaryListener = db.collection(COLLECTION_REQUESTS)
@@ -399,11 +442,25 @@ class ProductRegistrationRepository(
                 }
         } catch (_: Exception) {}
 
+        try {
+            evidenceListener = db.collection(COLLECTION_WITHDRAWAL)
+                .document(CATALOG_DOC_ID)
+                .collection(SUBCOLLECTION_EVIDENCE)
+                .whereEqualTo("docType", DOC_TYPE_REG_REQUEST)
+                .addSnapshotListener { snapshot, error ->
+                    if (error == null && snapshot != null) {
+                        evidenceItems = snapshot.documents.mapNotNull { parseRequest(it) }
+                        emitCount()
+                    }
+                }
+        } catch (_: Exception) {}
+
         emitCount()
 
         awaitClose {
             primaryListener?.remove()
             fallbackListener?.remove()
+            evidenceListener?.remove()
         }
     }
 
@@ -469,6 +526,20 @@ class ProductRegistrationRepository(
             try {
                 db.collection(COLLECTION_CLOUD_FALLBACK).document("req_${request.id}")
                     .set(updatePayload + mapOf("storeId" to REQUESTS_STORE_KEY), SetOptions.merge()).await()
+            } catch (_: Exception) {}
+
+            try {
+                db.collection(COLLECTION_WITHDRAWAL)
+                    .document(CATALOG_DOC_ID)
+                    .collection(SUBCOLLECTION_EVIDENCE)
+                    .document("req_${request.id}")
+                    .set(
+                        updatePayload + mapOf(
+                            "storeId" to REQUESTS_STORE_KEY,
+                            "docType" to DOC_TYPE_REG_REQUEST
+                        ),
+                        SetOptions.merge()
+                    ).await()
             } catch (_: Exception) {}
 
             updateCache(
@@ -549,6 +620,21 @@ class ProductRegistrationRepository(
             try {
                 db.collection(COLLECTION_CLOUD_FALLBACK).document("req_$requestId")
                     .set(updatePayload + mapOf("storeId" to REQUESTS_STORE_KEY), SetOptions.merge()).await()
+                anySucceeded = true
+            } catch (_: Exception) {}
+
+            try {
+                db.collection(COLLECTION_WITHDRAWAL)
+                    .document(CATALOG_DOC_ID)
+                    .collection(SUBCOLLECTION_EVIDENCE)
+                    .document("req_$requestId")
+                    .set(
+                        updatePayload + mapOf(
+                            "storeId" to REQUESTS_STORE_KEY,
+                            "docType" to DOC_TYPE_REG_REQUEST
+                        ),
+                        SetOptions.merge()
+                    ).await()
                 anySucceeded = true
             } catch (_: Exception) {}
 

@@ -79,7 +79,8 @@ fun NewRequestScreen(
     userProfile: UserProfile,
     onOpenScanner: () -> Unit,
     onBackToHome: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onRequestSubmitted: (() -> Unit)? = null
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showExitConfirmation by remember { mutableStateOf(false) }
@@ -208,7 +209,7 @@ fun NewRequestScreen(
                     isLoading = uiState.isLoading,
                     onSubmit = {
                         viewModel.submitRequest(userProfile) { _ ->
-                            onBackToHome()
+                            (onRequestSubmitted ?: onBackToHome).invoke()
                         }
                     },
                     onCancel = viewModel::cancelReview

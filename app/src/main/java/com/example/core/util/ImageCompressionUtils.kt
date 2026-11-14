@@ -80,7 +80,12 @@ object ImageCompressionUtils {
     fun decodeBase64ToImageBitmap(base64: String): ImageBitmap? {
         if (base64.isBlank()) return null
         return try {
-            val bytes = Base64.decode(base64, Base64.DEFAULT)
+            val cleaned = if (base64.contains(",")) {
+                base64.substringAfter(",").trim()
+            } else {
+                base64.trim()
+            }
+            val bytes = Base64.decode(cleaned, Base64.DEFAULT)
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
         } catch (_: Exception) {
             null

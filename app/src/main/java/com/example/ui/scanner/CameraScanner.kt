@@ -8,6 +8,7 @@ import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -41,6 +42,15 @@ fun CameraScanner(
         )
     }
 
+    DisposableEffect(lifecycleOwner) {
+        onDispose {
+            try {
+                cameraController.unbind()
+                barcodeScanner.close()
+            } catch (_: Exception) {}
+        }
+    }
+
     LaunchedEffect(cameraController) {
         cameraController.setImageAnalysisAnalyzer(
             ContextCompat.getMainExecutor(context),
@@ -49,14 +59,12 @@ fun CameraScanner(
                 val mediaImage = imageProxy.image
                 if (mediaImage != null) {
                     val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-                    android.util.Log.d("CameraScanner", "Processing image...")
                     barcodeScanner.process(inputImage)
                         .addOnSuccessListener { barcodes ->
-                            if (barcodes.isNotEmpty()) {
-                                android.util.Log.d("CameraScanner", "Barcode detected: ${barcodes.first().rawValue}")
-                            }
-                            barcodes.firstOrNull()?.rawValue?.let { barcode ->
-                                onBarcodeScanned(barcode)
+                            val validCode = barcodes.firstOrNull { !it.rawValue.isNullOrBlank() }?.rawValue
+                            if (!validCode.isNullOrBlank()) {
+                                android.util.Log.d("CameraScanner", "Barcode detected: $validCode")
+                                onBarcodeScanned(validCode)
                             }
                         }
                         .addOnFailureListener { e ->

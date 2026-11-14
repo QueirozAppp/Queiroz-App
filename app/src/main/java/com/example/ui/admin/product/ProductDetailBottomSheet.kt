@@ -317,14 +317,7 @@ private fun ViewProductDetailContent(
     onCopyBarcode: () -> Unit
 ) {
     val photoBitmap = remember(product.photoBase64) {
-        if (product.photoBase64.isNotBlank()) {
-            try {
-                val bytes = Base64.decode(product.photoBase64, Base64.DEFAULT)
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-            } catch (_: Exception) {
-                null
-            }
-        } else null
+        ImageCompressionUtils.decodeBase64ToImageBitmap(product.photoBase64)
     }
 
     // Exibição da Foto do Produto
@@ -606,14 +599,7 @@ private fun EditProductFormContent(
     var expandedUnitMenu by remember { mutableStateOf(false) }
 
     val photoBitmap = remember(uiState.editPhotoBase64) {
-        if (uiState.editPhotoBase64.isNotBlank()) {
-            try {
-                val bytes = Base64.decode(uiState.editPhotoBase64, Base64.DEFAULT)
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-            } catch (_: Exception) {
-                null
-            }
-        } else null
+        ImageCompressionUtils.decodeBase64ToImageBitmap(uiState.editPhotoBase64)
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {

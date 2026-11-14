@@ -94,13 +94,16 @@ class MainActivity : ComponentActivity() {
                 var selectedConferenceRequestId by remember { mutableStateOf("") }
                 var selectedStoreIdForSectors by remember { mutableStateOf("") }
                 var scannerSourceScreen by remember { mutableStateOf("new_request") }
+                var newRequestSourceScreen by remember { mutableStateOf("home") }
+                var conferenceSourceScreen by remember { mutableStateOf("pending_conferences") }
+                var conferenceReadOnly by remember { mutableStateOf(false) }
 
                 // Intercepta a tecla voltar do sistema operacional Android para não fechar o app em telas secundárias
                 BackHandler(enabled = uiState.authState is AuthState.Authenticated && !mustChangePassword && currentScreen != "home") {
                     when (currentScreen) {
                         "scanner" -> currentScreen = scannerSourceScreen
-                        "new_request" -> currentScreen = "my_requests"
-                        "conference_detail" -> currentScreen = "pending_conferences"
+                        "new_request" -> currentScreen = newRequestSourceScreen
+                        "conference_detail" -> currentScreen = conferenceSourceScreen
                         "admin_sectors" -> currentScreen = "admin_stores"
                         "request_product" -> currentScreen = "home"
                         "product_approval" -> currentScreen = "home"
@@ -168,10 +171,14 @@ class MainActivity : ComponentActivity() {
                             userProfile = profile,
                             onOpenRequestDetail = { reqId ->
                                 selectedConferenceRequestId = reqId
+                                conferenceSourceScreen = "operational_center"
+                                conferenceReadOnly = true
                                 currentScreen = "conference_detail"
                             },
                             onOpenConferenceDetail = { reqId ->
                                 selectedConferenceRequestId = reqId
+                                conferenceSourceScreen = "operational_center"
+                                conferenceReadOnly = false
                                 currentScreen = "conference_detail"
                             },
                             onBackToHome = { currentScreen = "home" }
@@ -234,7 +241,10 @@ class MainActivity : ComponentActivity() {
                         val profile = (uiState.authState as AuthState.Authenticated).userProfile
                         MyRequestsScreen(
                             userProfile = profile,
-                            onNewRequest = { currentScreen = "new_request" },
+                            onNewRequest = {
+                                newRequestSourceScreen = "my_requests"
+                                currentScreen = "new_request"
+                            },
                             onBackToHome = { currentScreen = "home" }
                         )
                     }
@@ -248,7 +258,8 @@ class MainActivity : ComponentActivity() {
                                 scannerSourceScreen = "new_request"
                                 currentScreen = "scanner"
                             },
-                            onBackToHome = { currentScreen = "my_requests" }
+                            onBackToHome = { currentScreen = newRequestSourceScreen },
+                            onRequestSubmitted = { currentScreen = "my_requests" }
                         )
                     }
                     currentScreen == "pending_conferences" -> {
@@ -257,6 +268,8 @@ class MainActivity : ComponentActivity() {
                             userProfile = profile,
                             onOpenConferenceDetail = { reqId ->
                                 selectedConferenceRequestId = reqId
+                                conferenceSourceScreen = "pending_conferences"
+                                conferenceReadOnly = false
                                 currentScreen = "conference_detail"
                             },
                             onBackToHome = { currentScreen = "home" }
@@ -268,7 +281,13 @@ class MainActivity : ComponentActivity() {
                             requestId = selectedConferenceRequestId,
                             viewModel = conferenceViewModel,
                             userProfile = profile,
-                            onBackToList = { currentScreen = "pending_conferences" }
+                            readOnlyView = conferenceReadOnly,
+                            backButtonLabel = if (conferenceSourceScreen == "operational_center") {
+                                "Voltar ao Centro Operacional"
+                            } else {
+                                "Voltar para Fila"
+                            },
+                            onBackToList = { currentScreen = conferenceSourceScreen }
                         )
                     }
                     currentScreen == "scanner" -> {
@@ -309,7 +328,10 @@ class MainActivity : ComponentActivity() {
                         HomeAuthenticatedScreen(
                             userProfile = profile,
                             onLogout = { loginViewModel.logout() },
-                            onOpenNewRequest = { currentScreen = "new_request" },
+                            onOpenNewRequest = {
+                                newRequestSourceScreen = "home"
+                                currentScreen = "new_request"
+                            },
                             onOpenOperationalCenter = { currentScreen = "operational_center" },
                             onOpenReports = { currentScreen = "reports" },
                             onOpenAdminUsers = { currentScreen = "admin_users" },

@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Inventory2
@@ -401,25 +402,17 @@ private fun ProductItemCard(
     onToggleActive: () -> Unit
 ) {
     val photoBitmap = remember(product.photoBase64) {
-        if (product.photoBase64.isNotBlank()) {
-            try {
-                val bytes = Base64.decode(product.photoBase64, Base64.DEFAULT)
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-            } catch (_: Exception) {
-                null
-            }
-        } else null
+        ImageCompressionUtils.decodeBase64ToImageBitmap(product.photoBase64)
     }
 
     Card(
+        onClick = onClick,
         colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.dp, AppColors.BorderSubtle),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
             .testTag("product_card_${product.id}")
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -435,24 +428,24 @@ private fun ProductItemCard(
                     if (photoBitmap != null) {
                         Image(
                             bitmap = photoBitmap,
-                            contentDescription = "Foto do produto",
+                            contentDescription = "Foto do produto ${product.name}",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(46.dp)
-                                .clip(RoundedCornerShape(10.dp))
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(12.dp))
                         )
                     } else {
                         Box(
                             modifier = Modifier
-                                .size(46.dp)
-                                .background(AppColors.PrimaryContainer, RoundedCornerShape(10.dp)),
+                                .size(56.dp)
+                                .background(AppColors.PrimaryContainer, RoundedCornerShape(12.dp)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Inventory2,
                                 contentDescription = null,
                                 tint = AppColors.Primary,
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(26.dp)
                             )
                         }
                     }
@@ -481,6 +474,12 @@ private fun ProductItemCard(
                             checkedTrackColor = AppColors.StatusCompleted
                         ),
                         modifier = Modifier.testTag("switch_product_active_${product.id}")
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "Abrir detalhes",
+                        tint = AppColors.TextTertiary
                     )
                 }
             }

@@ -19,11 +19,16 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
-          java-version: '17'
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Set up Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
 
       - name: Prepare APK Asset
         run: |
@@ -36,8 +41,10 @@ jobs:
             cp app/build/outputs/apk/debug/app-debug.apk release-assets/app-debug.apk
           else
             echo "Compiling debug APK via Gradle..."
-            # Using --info for troubleshooting, ignoring KSP issues if possible by focusing on assembleDebug
-            gradle :app:assembleDebug --no-daemon --stacktrace
+            if [ -n "$ANDROID_HOME" ] && [ -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+              yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
+            fi
+            gradle :app:assembleDebug --no-daemon --refresh-dependencies --stacktrace
             cp app/build/outputs/apk/debug/app-debug.apk release-assets/app-debug.apk
           fi
 

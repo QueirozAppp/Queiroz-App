@@ -87,7 +87,9 @@ fun ConferenceDetailScreen(
     viewModel: ConferenceViewModel,
     userProfile: UserProfile,
     onBackToList: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    readOnlyView: Boolean = false,
+    backButtonLabel: String = "Voltar para Fila"
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -111,8 +113,8 @@ fun ConferenceDetailScreen(
         }
     }
 
-    LaunchedEffect(requestId) {
-        viewModel.loadRequestForConference(requestId, userProfile)
+    LaunchedEffect(requestId, readOnlyView) {
+        viewModel.loadRequestForConference(requestId, userProfile, readOnlyView = readOnlyView)
     }
 
     BackHandler(enabled = true) {
@@ -145,7 +147,7 @@ fun ConferenceDetailScreen(
                 title = {
                     Column {
                         Text(
-                            text = "Conferência Física",
+                            text = if (readOnlyView || uiState.isFinalized) "Detalhes da Baixa" else "Conferência Física",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = AppColors.TextPrimary
@@ -179,7 +181,7 @@ fun ConferenceDetailScreen(
             if (!uiState.errorMessage.isNullOrEmpty()) {
                 AppErrorBanner(
                     message = uiState.errorMessage ?: "",
-                    onRetry = { viewModel.loadRequestForConference(requestId, userProfile) },
+                    onRetry = { viewModel.loadRequestForConference(requestId, userProfile, readOnlyView = readOnlyView) },
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
             }
@@ -228,6 +230,30 @@ fun ConferenceDetailScreen(
                                 fontWeight = FontWeight.SemiBold,
                                 color = AppColors.StatusInConferenceText
                             )
+                        }
+                        if (!req.checkedByName.isNullOrBlank()) {
+                            Text(
+                                text = "Finalizado por: ${req.checkedByName}",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = AppColors.StatusCompletedText
+                            )
+                        }
+                        if (!req.divergenceReason.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = AppColors.StatusDivergenceBg,
+                                border = BorderStroke(1.dp, AppColors.StatusDivergence.copy(alpha = 0.3f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = "Motivo da divergência: ${req.divergenceReason}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = AppColors.StatusDivergenceText,
+                                    modifier = Modifier.padding(8.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -344,7 +370,7 @@ fun ConferenceDetailScreen(
                 }
 
                 Text(
-                    text = "Produtos a Conferir (${uiState.items.size})",
+                    text = if (readOnlyView || uiState.isFinalized) "Produtos da Solicitação (${uiState.items.size})" else "Produtos a Conferir (${uiState.items.size})",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = AppColors.TextPrimary,
@@ -428,8 +454,9 @@ fun ConferenceDetailScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp)
+                            .testTag("btn_back_from_conference_detail")
                     ) {
-                        Text("Voltar para Fila", style = MaterialTheme.typography.labelLarge)
+                        Text(backButtonLabel, style = MaterialTheme.typography.labelLarge)
                     }
                 }
             }

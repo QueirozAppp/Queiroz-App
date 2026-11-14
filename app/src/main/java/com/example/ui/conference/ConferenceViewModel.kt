@@ -5,8 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.example.core.data.WithdrawalRequestRepository
 import com.example.core.model.ConferenceEvidence
 import com.example.core.model.UserProfile
+import com.example.core.model.UserRole
 import com.example.core.model.WithdrawalRequest
 import com.example.core.model.WithdrawalRequestItem
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,9 +25,26 @@ class ConferenceViewModel(
     private val _uiState = MutableStateFlow(ConferenceUiState())
     val uiState: StateFlow<ConferenceUiState> = _uiState.asStateFlow()
 
-    fun loadRequestForConference(requestId: String, userProfile: UserProfile) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+    private var loadJob: Job? = null
+
+    fun loadRequestForConference(
+        requestId: String,
+        userProfile: UserProfile,
+        readOnlyView: Boolean = false
+    ) {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    errorMessage = null,
+                    currentRequest = null,
+                    items = emptyList(),
+                    evidences = emptyList(),
+                    isFinalized = false,
+                    finalStatus = null
+                )
+            }
 
             // Escutar evidências em tempo real
             launch {
@@ -34,42 +53,68 @@ class ConferenceViewModel(
                 }
             }
 
-            val startResult = repository.startConference(requestId, userProfile)
-            startResult.fold(
-                onSuccess = {
-                    val requestResult = repository.getRequestById(requestId)
-                    requestResult.fold(
-                        onSuccess = { req ->
-                            if (req == null) {
+            val initialResult = repository.getRequestById(requestId)
+            initialResult.fold(
+                onSuccess = { req ->
+                    if (req == null) {
+                        _uiState.update {
+                            it.copy(isLoading = false, errorMessage = "Solicitação não encontrada.")
+                        }
+                        return@fold
+                    }
+
+                    val isAlreadyFinalized = req.status in listOf("COMPLETED", "DIVERGENCE", "CANCELLED", "RECTIFIED")
+                    val canConductConference = !readOnlyView &&
+                        (userProfile.role == UserRole.AVARISTA || userProfile.role == UserRole.ADMIN)
+
+                    if (isAlreadyFinalized || !canConductConference) {
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                currentRequest = req,
+                                items = req.items,
+                                divergenceReasonInput = req.divergenceReason ?: "",
+                                isFinalized = true,
+                                finalStatus = req.status,
+                                errorMessage = null
+                            )
+                        }
+                    } else {
+                        val startResult = repository.startConference(requestId, userProfile)
+                        startResult.fold(
+                            onSuccess = {
+                                val updatedReq = repository.getRequestById(requestId).getOrNull() ?: req
+                                val finalized = updatedReq.status in listOf("COMPLETED", "DIVERGENCE", "CANCELLED", "RECTIFIED")
                                 _uiState.update {
-                                    it.copy(isLoading = false, errorMessage = "Solicitação não encontrada.")
+                                    it.copy(
+                                        isLoading = false,
+                                        currentRequest = updatedReq,
+                                        items = updatedReq.items,
+                                        divergenceReasonInput = updatedReq.divergenceReason ?: "",
+                                        isFinalized = finalized,
+                                        finalStatus = if (finalized) updatedReq.status else null
+                                    )
                                 }
-                            } else {
+                            },
+                            onFailure = { err ->
                                 _uiState.update {
                                     it.copy(
                                         isLoading = false,
                                         currentRequest = req,
                                         items = req.items,
                                         divergenceReasonInput = req.divergenceReason ?: "",
-                                        isFinalized = req.status in listOf("COMPLETED", "DIVERGENCE"),
-                                        finalStatus = if (req.status in listOf("COMPLETED", "DIVERGENCE")) req.status else null
+                                        isFinalized = true,
+                                        finalStatus = req.status,
+                                        errorMessage = err.localizedMessage ?: "Erro ao iniciar conferência."
                                     )
                                 }
                             }
-                        },
-                        onFailure = { err ->
-                            _uiState.update {
-                                it.copy(isLoading = false, errorMessage = err.localizedMessage ?: "Erro ao carregar dados.")
-                            }
-                        }
-                    )
+                        )
+                    }
                 },
                 onFailure = { err ->
                     _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            errorMessage = err.localizedMessage ?: "Erro ao iniciar conferência."
-                        )
+                        it.copy(isLoading = false, errorMessage = err.localizedMessage ?: "Erro ao carregar dados.")
                     }
                 }
             )
