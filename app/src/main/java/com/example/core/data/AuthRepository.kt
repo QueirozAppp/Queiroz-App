@@ -300,28 +300,33 @@ class AuthRepository {
                 return Result.success(userProfile)
             }
         } catch (e: Exception) {
-            android.util.Log.e("AuthRepository", "Login failed: ${e.javaClass.simpleName} - ${e.message}", e)
+            val isAuthCredentialError = e is com.google.firebase.auth.FirebaseAuthInvalidCredentialsException ||
+                    e is com.google.firebase.auth.FirebaseAuthInvalidUserException ||
+                    e.message?.contains("credential", ignoreCase = true) == true ||
+                    e.message?.contains("password", ignoreCase = true) == true ||
+                    e.message?.contains("wrong-password", ignoreCase = true) == true
+
+            if (isAuthCredentialError) {
+                android.util.Log.w("AuthRepository", "Login credentials warning: ${e.message}")
+            } else {
+                android.util.Log.e("AuthRepository", "Login failed: ${e.javaClass.simpleName} - ${e.message}", e)
+            }
+
             val rawMsg = e.localizedMessage ?: e.message ?: ""
             val message = when {
+                isAuthCredentialError -> "E-mail ou senha incorretos. Verifique os dados informados."
                 e is SecurityException -> e.message ?: "Acesso negado."
                 e is IllegalArgumentException -> e.message ?: "Dado inválido."
                 e is IllegalStateException -> e.message ?: "Erro operacional."
                 rawMsg.contains("CONFIGURATION_NOT_FOUND", ignoreCase = true) ->
                     "Configuração do Firebase Auth pendente: Ative o provedor 'E-mail/Senha' em Firebase Console -> Authentication -> Sign-in method (Projeto: appqueirozavaria)."
-                rawMsg.contains("password", ignoreCase = true) ||
-                        rawMsg.contains("credential", ignoreCase = true) ||
-                        rawMsg.contains("no user record", ignoreCase = true) ||
-                        rawMsg.contains("user-not-found", ignoreCase = true) ||
-                        rawMsg.contains("wrong-password", ignoreCase = true) ||
-                        rawMsg.contains("invalid-credential", ignoreCase = true) ->
-                    "Não foi possível entrar. Verifique seu e-mail e senha."
                 rawMsg.contains("USER_DISABLED", ignoreCase = true) ->
                     "Esta conta está desativada no Firebase Authentication."
                 rawMsg.contains("offline", ignoreCase = true) || rawMsg.contains("client is offline", ignoreCase = true) ->
                     "Não foi possível conectar ao Cloud Firestore. Verifique se o 'Firestore Database' foi criado no Firebase Console (Projeto: appqueirozavaria) e se o aparelho está online."
                 rawMsg.contains("network", ignoreCase = true) ->
                     "Erro de conexão com o servidor Firebase. Verifique sua internet."
-                else -> "Não foi possível entrar. [ ${rawMsg} ]"
+                else -> "Não foi possível entrar. Verifique seu e-mail e senha."
             }
             Result.failure(Exception(message))
         }

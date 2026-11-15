@@ -113,16 +113,16 @@ object AppColors {
 
     // Tipografia Neutra
     val TextPrimary: Color
-        get() = if (isDark) Color(0xFFF8FAFC) else Color(0xFF0F172A)
+        get() = if (isDark) Color(0xFFF8FAFC) else Color(0xFF000000)
 
     val TextSecondary: Color
-        get() = if (isDark) Color(0xFF94A3B8) else Color(0xFF475569)
+        get() = if (isDark) Color(0xFF94A3B8) else Color(0xFF111827)
 
     val TextTertiary: Color
-        get() = if (isDark) Color(0xFF64748B) else Color(0xFF64748B)
+        get() = if (isDark) Color(0xFF64748B) else Color(0xFF1F2937)
 
     val TextDisabled: Color
-        get() = if (isDark) Color(0xFF475569) else Color(0xFF94A3B8)
+        get() = if (isDark) Color(0xFF475569) else Color(0xFF4B5563)
 
     // Estados Semânticos de Baixa
     val StatusPending: Color

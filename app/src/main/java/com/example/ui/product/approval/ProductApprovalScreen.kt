@@ -387,43 +387,79 @@ fun ProductApprovalScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 item {
+                    val isSelected = uiState.filterStatus == "PENDING"
                     FilterChip(
-                        selected = uiState.filterStatus == "PENDING",
+                        selected = isSelected,
                         onClick = { viewModel.onFilterStatusChanged("PENDING") },
                         label = { Text("Pendentes (${uiState.pendingCount})") },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AppColors.PrimaryContainer,
-                            selectedLabelColor = AppColors.Primary
+                            selectedLabelColor = AppColors.Primary,
+                            containerColor = AppColors.Surface,
+                            labelColor = AppColors.TextSecondary
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = if (isSelected) AppColors.Primary else AppColors.BorderSubtle
                         )
                     )
                 }
                 item {
+                    val isSelected = uiState.filterStatus == "APPROVED"
                     FilterChip(
-                        selected = uiState.filterStatus == "APPROVED",
+                        selected = isSelected,
                         onClick = { viewModel.onFilterStatusChanged("APPROVED") },
                         label = { Text("Aprovados") },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AppColors.StatusCompletedBg,
-                            selectedLabelColor = AppColors.StatusCompletedText
+                            selectedLabelColor = AppColors.StatusCompletedText,
+                            containerColor = AppColors.Surface,
+                            labelColor = AppColors.TextSecondary
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = if (isSelected) AppColors.StatusCompleted else AppColors.BorderSubtle
                         )
                     )
                 }
                 item {
+                    val isSelected = uiState.filterStatus == "REJECTED"
                     FilterChip(
-                        selected = uiState.filterStatus == "REJECTED",
+                        selected = isSelected,
                         onClick = { viewModel.onFilterStatusChanged("REJECTED") },
                         label = { Text("Recusados") },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AppColors.StatusDivergenceBg,
-                            selectedLabelColor = AppColors.StatusDivergenceText
+                            selectedLabelColor = AppColors.StatusDivergenceText,
+                            containerColor = AppColors.Surface,
+                            labelColor = AppColors.TextSecondary
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = if (isSelected) AppColors.StatusDivergence else AppColors.BorderSubtle
                         )
                     )
                 }
                 item {
+                    val isSelected = uiState.filterStatus == "ALL"
                     FilterChip(
-                        selected = uiState.filterStatus == "ALL",
+                        selected = isSelected,
                         onClick = { viewModel.onFilterStatusChanged("ALL") },
-                        label = { Text("Todos") }
+                        label = { Text("Todos") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = AppColors.PrimaryContainer,
+                            selectedLabelColor = AppColors.Primary,
+                            containerColor = AppColors.Surface,
+                            labelColor = AppColors.TextSecondary
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = if (isSelected) AppColors.Primary else AppColors.BorderSubtle
+                        )
                     )
                 }
             }
