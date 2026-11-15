@@ -11,11 +11,11 @@ import java.io.ByteArrayOutputStream
 
 /**
  * Utilitários seguros para decodificação, redimensionamento e compactação de imagens
- * em Base64, garantindo baixo uso de memória e respeito ao limite de documentos do Firestore.
+ * em Base64, mantendo alta resolução e qualidade original para legibilidade de rótulos e códigos.
  */
 object ImageCompressionUtils {
 
-    fun decodeScaledBitmapFromUri(context: Context, uri: Uri, maxDimension: Int = 1024): Bitmap? {
+    fun decodeScaledBitmapFromUri(context: Context, uri: Uri, maxDimension: Int = 2048): Bitmap? {
         return try {
             val boundsOptions = BitmapFactory.Options().apply {
                 inJustDecodeBounds = true
@@ -48,9 +48,9 @@ object ImageCompressionUtils {
 
     fun resizeAndCompressBitmap(
         bitmap: Bitmap,
-        maxDimension: Int = 720,
-        initialQuality: Int = 72,
-        maxBytes: Int = 260_000
+        maxDimension: Int = 2048,
+        initialQuality: Int = 92,
+        maxBytes: Int = 2_500_000
     ): String {
         val width = bitmap.width
         val height = bitmap.height
@@ -71,8 +71,8 @@ object ImageCompressionUtils {
             val outputStream = ByteArrayOutputStream()
             scaledBitmap.compress(Bitmap.CompressFormat.JPEG, currentQuality, outputStream)
             bytes = outputStream.toByteArray()
-            currentQuality -= 12
-        } while (bytes.size > maxBytes && currentQuality >= 28)
+            currentQuality -= 5
+        } while (bytes.size > maxBytes && currentQuality >= 75)
 
         return Base64.encodeToString(bytes, Base64.NO_WRAP)
     }

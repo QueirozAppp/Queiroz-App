@@ -236,10 +236,18 @@ class AuthRepository {
             val isFirstAccess = !userProfile.passwordDefined || userProfile.mustChangePassword
             val isChangePermitted = userProfile.allowPasswordChange
 
+            if (isFirstAccess) {
+                // Primeiro acesso: autenticou com sucesso, mas exige que o usuário defina sua senha permanente
+                return Result.success(
+                    userProfile.copy(
+                        mustChangePassword = true
+                    )
+                )
+            }
+
             if (!isDirectLoginSuccessful) {
-                // Entrou via senha temporária ou criação inicial:
-                // O usuário forneceu 'password' no login. Essa senha agora se torna definitiva!
-                if (isFirstAccess || isChangePermitted) {
+                // Entrou via senha temporária com permissão explícita de troca pelo admin
+                if (isChangePermitted) {
                     if (password.length < 6) {
                         firebaseAuth.signOut()
                         return Result.failure(IllegalArgumentException("A nova senha definida deve ter no mínimo 6 caracteres."))
@@ -289,24 +297,7 @@ class AuthRepository {
                 }
             } else {
                 // Login direto com a senha existente
-                if (!userProfile.passwordDefined) {
-                    try {
-                        db.collection("users").document(profileDocId).update(
-                            mapOf(
-                                "passwordDefined" to true,
-                                "mustChangePassword" to false,
-                                "allowPasswordChange" to false
-                            )
-                        ).await()
-                    } catch (_: Exception) {}
-                }
-                return Result.success(
-                    userProfile.copy(
-                        passwordDefined = true,
-                        mustChangePassword = false,
-                        allowPasswordChange = false
-                    )
-                )
+                return Result.success(userProfile)
             }
         } catch (e: Exception) {
             android.util.Log.e("AuthRepository", "Login failed: ${e.javaClass.simpleName} - ${e.message}", e)

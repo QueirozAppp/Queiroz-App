@@ -662,9 +662,14 @@ class WithdrawalRequestRepository(
             var query: com.google.firebase.firestore.Query = db.collection("withdrawalRequests")
 
             when (userProfile.role) {
-                UserRole.ADMIN, UserRole.AVARISTA -> {
+                UserRole.ADMIN -> {
                     if (!filterStoreId.isNullOrBlank() && filterStoreId != "ALL") {
                         query = query.whereEqualTo("storeId", filterStoreId)
+                    }
+                }
+                UserRole.AVARISTA -> {
+                    if (userProfile.storeId.isNotBlank()) {
+                        query = query.whereEqualTo("storeId", userProfile.storeId.trim())
                     }
                 }
                 UserRole.SETOR_LEADER -> {
@@ -753,9 +758,14 @@ class WithdrawalRequestRepository(
             var query: com.google.firebase.firestore.Query = db.collection("withdrawalRequests")
 
             when (userProfile.role) {
-                UserRole.ADMIN, UserRole.AVARISTA -> {
+                UserRole.ADMIN -> {
                     if (!filterStoreId.isNullOrBlank() && filterStoreId != "ALL") {
                         query = query.whereEqualTo("storeId", filterStoreId)
+                    }
+                }
+                UserRole.AVARISTA -> {
+                    if (userProfile.storeId.isNotBlank()) {
+                        query = query.whereEqualTo("storeId", userProfile.storeId.trim())
                     }
                 }
                 UserRole.SETOR_LEADER -> {

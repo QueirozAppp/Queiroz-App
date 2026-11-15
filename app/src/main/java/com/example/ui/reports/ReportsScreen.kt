@@ -164,7 +164,9 @@ fun ReportsScreen(
                         label = { Text("Hoje") },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AppColors.PrimaryContainer,
-                            selectedLabelColor = AppColors.Primary
+                            selectedLabelColor = AppColors.Primary,
+                            containerColor = AppColors.Surface,
+                            labelColor = AppColors.TextSecondary
                         )
                     )
                 }
@@ -175,7 +177,9 @@ fun ReportsScreen(
                         label = { Text("Últimos 7 dias") },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AppColors.PrimaryContainer,
-                            selectedLabelColor = AppColors.Primary
+                            selectedLabelColor = AppColors.Primary,
+                            containerColor = AppColors.Surface,
+                            labelColor = AppColors.TextSecondary
                         )
                     )
                 }
@@ -186,7 +190,9 @@ fun ReportsScreen(
                         label = { Text("Últimos 30 dias") },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AppColors.PrimaryContainer,
-                            selectedLabelColor = AppColors.Primary
+                            selectedLabelColor = AppColors.Primary,
+                            containerColor = AppColors.Surface,
+                            labelColor = AppColors.TextSecondary
                         )
                     )
                 }
@@ -197,7 +203,9 @@ fun ReportsScreen(
                         label = { Text("Todo o histórico") },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AppColors.PrimaryContainer,
-                            selectedLabelColor = AppColors.Primary
+                            selectedLabelColor = AppColors.Primary,
+                            containerColor = AppColors.Surface,
+                            labelColor = AppColors.TextSecondary
                         )
                     )
                 }
@@ -225,7 +233,9 @@ fun ReportsScreen(
                             label = { Text("Todas as Lojas") },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = AppColors.PrimaryContainer,
-                                selectedLabelColor = AppColors.Primary
+                                selectedLabelColor = AppColors.Primary,
+                                containerColor = AppColors.Surface,
+                                labelColor = AppColors.TextSecondary
                             )
                         )
                     }
@@ -236,7 +246,9 @@ fun ReportsScreen(
                             label = { Text(storeId) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = AppColors.PrimaryContainer,
-                                selectedLabelColor = AppColors.Primary
+                                selectedLabelColor = AppColors.Primary,
+                                containerColor = AppColors.Surface,
+                                labelColor = AppColors.TextSecondary
                             )
                         )
                     }

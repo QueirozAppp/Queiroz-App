@@ -852,7 +852,7 @@ private fun EditProductFormContent(
 /**
  * Utilitário para redimensionar e compactar fotos antes de salvar em Base64
  */
-internal fun resizeAndCompressBitmap(bitmap: Bitmap, maxDimension: Int = 720, quality: Int = 72): String {
+internal fun resizeAndCompressBitmap(bitmap: Bitmap, maxDimension: Int = 2048, quality: Int = 92): String {
     return ImageCompressionUtils.resizeAndCompressBitmap(
         bitmap = bitmap,
         maxDimension = maxDimension,

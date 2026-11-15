@@ -147,7 +147,7 @@ class AppUpdateViewModel(
                         _uiState.update {
                             it.copy(
                                 isChecking = false,
-                                statusMessage = "Arquivo de versão não encontrado no endereço: ${outcome.url}",
+                                statusMessage = "Arquivo de versão não encontrado no servidor.",
                                 isStatusError = true
                             )
                         }

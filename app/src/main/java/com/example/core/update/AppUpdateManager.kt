@@ -34,9 +34,18 @@ class AppUpdateManager(
         private const val KEY_CACHED_URL = "cached_url"
     }
 
+    private fun getUserId(): String {
+        return try {
+            com.example.core.firebase.FirebaseProvider.getAuthOrNull()?.currentUser?.uid ?: "guest"
+        } catch (_: Exception) {
+            "guest"
+        }
+    }
+
     private fun readPrefs(): android.content.SharedPreferences? {
         return try {
-            appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val uid = getUserId()
+            appContext.getSharedPreferences("${PREFS_NAME}_$uid", Context.MODE_PRIVATE)
         } catch (_: Exception) {
             null
         }

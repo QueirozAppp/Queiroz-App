@@ -229,7 +229,9 @@ fun OperationalCenterScreen(
                         label = { Text("Tudo") },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AppColors.PrimaryContainer,
-                            selectedLabelColor = AppColors.Primary
+                            selectedLabelColor = AppColors.Primary,
+                            containerColor = AppColors.Surface,
+                            labelColor = AppColors.TextSecondary
                         )
                     )
                 }
@@ -240,7 +242,9 @@ fun OperationalCenterScreen(
                         label = { Text("Hoje") },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AppColors.PrimaryContainer,
-                            selectedLabelColor = AppColors.Primary
+                            selectedLabelColor = AppColors.Primary,
+                            containerColor = AppColors.Surface,
+                            labelColor = AppColors.TextSecondary
                         )
                     )
                 }
@@ -251,7 +255,9 @@ fun OperationalCenterScreen(
                         label = { Text("Últimos 7 dias") },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AppColors.PrimaryContainer,
-                            selectedLabelColor = AppColors.Primary
+                            selectedLabelColor = AppColors.Primary,
+                            containerColor = AppColors.Surface,
+                            labelColor = AppColors.TextSecondary
                         )
                     )
                 }
@@ -262,7 +268,9 @@ fun OperationalCenterScreen(
                         label = { Text("Últimos 30 dias") },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AppColors.PrimaryContainer,
-                            selectedLabelColor = AppColors.Primary
+                            selectedLabelColor = AppColors.Primary,
+                            containerColor = AppColors.Surface,
+                            labelColor = AppColors.TextSecondary
                         )
                     )
                 }
@@ -290,7 +298,9 @@ fun OperationalCenterScreen(
                             label = { Text("Todas as Lojas") },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = AppColors.PrimaryContainer,
-                                selectedLabelColor = AppColors.Primary
+                                selectedLabelColor = AppColors.Primary,
+                                containerColor = AppColors.Surface,
+                                labelColor = AppColors.TextSecondary
                             )
                         )
                     }
@@ -301,7 +311,9 @@ fun OperationalCenterScreen(
                             label = { Text(storeId) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = AppColors.PrimaryContainer,
-                                selectedLabelColor = AppColors.Primary
+                                selectedLabelColor = AppColors.Primary,
+                                containerColor = AppColors.Surface,
+                                labelColor = AppColors.TextSecondary
                             )
                         )
                     }
