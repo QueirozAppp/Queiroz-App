@@ -30,12 +30,16 @@ data class RemoteVersionInfo(
 )
 
 /**
- * Resultado interno de [AppUpdateManager.checkForUpdate].
+ * Resultado detalhado da verificação de atualização.
  */
 sealed class UpdateCheckOutcome {
     data class UpdateAvailable(val info: RemoteVersionInfo) : UpdateCheckOutcome()
     data class UpToDate(val info: RemoteVersionInfo) : UpdateCheckOutcome()
-    data object OfflineOrError : UpdateCheckOutcome()
+    data object Offline : UpdateCheckOutcome()
+    data object Timeout : UpdateCheckOutcome()
+    data class HttpNotFound(val url: String) : UpdateCheckOutcome()
+    data class HttpError(val statusCode: Int) : UpdateCheckOutcome()
+    data object InvalidJson : UpdateCheckOutcome()
     data object SkippedInterval : UpdateCheckOutcome()
 }
 

@@ -73,9 +73,7 @@ class AppUpdateViewModel(
                             it.copy(availableUpdate = null, showBanner = false)
                         }
                     }
-                    UpdateCheckOutcome.OfflineOrError,
-                    UpdateCheckOutcome.SkippedInterval -> {
-                        // Falha silenciosa ou dentro das 6h: mantém o cache se não foi dispensado
+                    else -> {
                         restoreCachedBannerIfNeeded()
                     }
                 }
@@ -127,24 +125,68 @@ class AppUpdateViewModel(
                             )
                         }
                     }
-                    UpdateCheckOutcome.OfflineOrError,
-                    UpdateCheckOutcome.SkippedInterval -> {
+                    is UpdateCheckOutcome.Offline -> {
                         _uiState.update {
                             it.copy(
                                 isChecking = false,
-                                statusMessage = "Não consegui verificar. Confira a conexão.",
+                                statusMessage = "Sem conexão com a internet. Confira o Wi-Fi.",
                                 isStatusError = true
+                            )
+                        }
+                    }
+                    is UpdateCheckOutcome.Timeout -> {
+                        _uiState.update {
+                            it.copy(
+                                isChecking = false,
+                                statusMessage = "A verificação demorou demais. Tente novamente.",
+                                isStatusError = true
+                            )
+                        }
+                    }
+                    is UpdateCheckOutcome.HttpNotFound -> {
+                        _uiState.update {
+                            it.copy(
+                                isChecking = false,
+                                statusMessage = "Arquivo de versão não encontrado no endereço: ${outcome.url}",
+                                isStatusError = true
+                            )
+                        }
+                    }
+                    is UpdateCheckOutcome.HttpError -> {
+                        _uiState.update {
+                            it.copy(
+                                isChecking = false,
+                                statusMessage = "Erro do servidor ao verificar (código ${outcome.statusCode}).",
+                                isStatusError = true
+                            )
+                        }
+                    }
+                    is UpdateCheckOutcome.InvalidJson -> {
+                        _uiState.update {
+                            it.copy(
+                                isChecking = false,
+                                statusMessage = "O endereço de atualização não devolveu os dados de versão. Confira o arquivo version.json.",
+                                isStatusError = true
+                            )
+                        }
+                    }
+                    is UpdateCheckOutcome.SkippedInterval -> {
+                        _uiState.update {
+                            it.copy(
+                                isChecking = false,
+                                statusMessage = "Você já está na versão mais recente.",
+                                isStatusError = false
                             )
                         }
                     }
                 }
             } catch (ce: kotlinx.coroutines.CancellationException) {
                 throw ce
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
                         isChecking = false,
-                        statusMessage = "Não consegui verificar. Confira a conexão.",
+                        statusMessage = "Sem conexão com a internet. Confira o Wi-Fi.",
                         isStatusError = true
                     )
                 }

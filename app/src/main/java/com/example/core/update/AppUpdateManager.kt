@@ -11,17 +11,16 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.UnknownHostException
+import java.net.SocketTimeoutException
+import java.net.ConnectException
 
-/**
- * Gerencia a verificação de atualizações consultando o version.json remoto,
- * respeitando timeout de 8s, intervalo automático de 6h e persistência segura em SharedPreferences.
- */
 class AppUpdateManager(
     context: Context,
     private val currentBuild: Int = AppUpdateConfig.APP_BUILD,
     private val versionUrl: String = AppUpdateConfig.VERSION_JSON_URL,
     private val nowProvider: () -> Long = { System.currentTimeMillis() },
-    private val fetcher: (suspend (String) -> RemoteVersionInfo?)? = null
+    private val fetcher: (suspend (String) -> UpdateCheckOutcome)? = null
 ) {
     private val appContext = context.applicationContext ?: context
 
@@ -54,9 +53,7 @@ class AppUpdateManager(
     private fun saveLastCheckTimestamp(timestamp: Long) {
         try {
             readPrefs()?.edit()?.putLong(KEY_LAST_CHECK_AT, timestamp)?.apply()
-        } catch (_: Exception) {
-            // Ignora falha de escrita para não interromper o app
-        }
+        } catch (_: Exception) {}
     }
 
     fun getDismissedBuild(): Int {
@@ -70,9 +67,7 @@ class AppUpdateManager(
     fun dismissVersion(build: Int) {
         try {
             readPrefs()?.edit()?.putInt(KEY_DISMISSED_BUILD, build)?.apply()
-        } catch (_: Exception) {
-            // Ignora falha de escrita
-        }
+        } catch (_: Exception) {}
     }
 
     fun getCachedUpdate(): RemoteVersionInfo? {
@@ -104,9 +99,7 @@ class AppUpdateManager(
                 ?.putString(KEY_CACHED_NOTES, info.notes)
                 ?.putString(KEY_CACHED_URL, info.url)
                 ?.apply()
-        } catch (_: Exception) {
-            // Ignora falha de escrita
-        }
+        } catch (_: Exception) {}
     }
 
     private fun clearCachedUpdate() {
@@ -117,9 +110,7 @@ class AppUpdateManager(
                 ?.remove(KEY_CACHED_NOTES)
                 ?.remove(KEY_CACHED_URL)
                 ?.apply()
-        } catch (_: Exception) {
-            // Ignora falha de escrita
-        }
+        } catch (_: Exception) {}
     }
 
     fun shouldDisplayBanner(info: RemoteVersionInfo, forceShow: Boolean = false): Boolean {
@@ -128,10 +119,6 @@ class AppUpdateManager(
         return getDismissedBuild() != info.build
     }
 
-    /**
-     * Busca o version.json remoto sem cache e com timeout de 8 segundos.
-     * Se falhar, retorna null ("sem conexão") sem lançar exceções para a UI.
-     */
     suspend fun checkForUpdate(force: Boolean = false): UpdateCheckOutcome {
         val now = nowProvider()
         if (!force) {
@@ -146,7 +133,7 @@ class AppUpdateManager(
             }
         }
 
-        val remote = try {
+        val outcome = try {
             withTimeout(AppUpdateConfig.REQUEST_TIMEOUT_MS.toLong()) {
                 if (fetcher != null) {
                     fetcher.invoke(versionUrl)
@@ -155,28 +142,45 @@ class AppUpdateManager(
                 }
             }
         } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
-            null
+            UpdateCheckOutcome.Timeout
         } catch (ce: kotlinx.coroutines.CancellationException) {
             throw ce
-        } catch (_: Exception) {
-            null
-        } ?: return UpdateCheckOutcome.OfflineOrError
+        } catch (e: Exception) {
+            classifyException(e)
+        }
 
-        saveLastCheckTimestamp(now)
-
-        return if (remote.build > currentBuild) {
-            saveCachedUpdate(remote)
-            UpdateCheckOutcome.UpdateAvailable(remote)
-        } else {
+        if (outcome is UpdateCheckOutcome.UpdateAvailable) {
+            saveLastCheckTimestamp(now)
+            saveCachedUpdate(outcome.info)
+        } else if (outcome is UpdateCheckOutcome.UpToDate) {
+            saveLastCheckTimestamp(now)
             clearCachedUpdate()
-            UpdateCheckOutcome.UpToDate(remote)
+        }
+
+        return outcome
+    }
+
+    private fun classifyException(e: Exception): UpdateCheckOutcome {
+        return when (e) {
+            is SocketTimeoutException -> UpdateCheckOutcome.Timeout
+            is UnknownHostException, is ConnectException -> UpdateCheckOutcome.Offline
+            else -> {
+                val msg = e.message?.lowercase() ?: ""
+                if (msg.contains("timeout") || msg.contains("timed out")) {
+                    UpdateCheckOutcome.Timeout
+                } else if (msg.contains("host") || msg.contains("connection") || msg.contains("network") || msg.contains("unreachable")) {
+                    UpdateCheckOutcome.Offline
+                } else {
+                    UpdateCheckOutcome.Offline
+                }
+            }
         }
     }
 
     private suspend fun fetchRemoteVersionFromNetwork(
         baseUrl: String,
         timestamp: Long
-    ): RemoteVersionInfo? = withContext(Dispatchers.IO) {
+    ): UpdateCheckOutcome = withContext(Dispatchers.IO) {
         var connection: HttpURLConnection? = null
         try {
             val separator = if (baseUrl.contains("?")) "&" else "?"
@@ -187,25 +191,56 @@ class AppUpdateManager(
                 readTimeout = AppUpdateConfig.REQUEST_TIMEOUT_MS
                 useCaches = false
                 defaultUseCaches = false
+                setRequestProperty("User-Agent", "QRZ-Stock-Android-App")
                 setRequestProperty("Cache-Control", "no-store, no-cache, must-revalidate")
                 setRequestProperty("Pragma", "no-cache")
-            } ?: return@withContext null
+            } ?: return@withContext UpdateCheckOutcome.Offline
 
-            if (connection.responseCode !in 200..299) {
-                return@withContext null
+            val responseCode = try {
+                connection.responseCode
+            } catch (e: Exception) {
+                return@withContext classifyException(e)
             }
 
+            if (responseCode == 404) {
+                return@withContext UpdateCheckOutcome.HttpNotFound(noCacheUrl)
+            }
+            if (responseCode !in 200..299) {
+                return@withContext UpdateCheckOutcome.HttpError(responseCode)
+            }
+
+            val contentType = connection.contentType?.lowercase() ?: ""
             val body = BufferedReader(InputStreamReader(connection.inputStream)).use { reader ->
                 reader.readText()
             }
-            parseVersionJson(body)
-        } catch (_: Exception) {
-            null
+
+            val trimmed = body.trim().lowercase()
+            if (contentType.contains("text/html") || trimmed.startsWith("<!doctype") || trimmed.startsWith("<html")) {
+                return@withContext UpdateCheckOutcome.InvalidJson
+            }
+
+            val remoteInfo = parseVersionJson(body)
+            if (remoteInfo == null) {
+                UpdateCheckOutcome.InvalidJson
+            } else {
+                if (remoteInfo.build > currentBuild) {
+                    UpdateCheckOutcome.UpdateAvailable(remoteInfo)
+                } else {
+                    UpdateCheckOutcome.UpToDate(remoteInfo)
+                }
+            }
+        } catch (e: SocketTimeoutException) {
+            UpdateCheckOutcome.Timeout
+        } catch (e: UnknownHostException) {
+            UpdateCheckOutcome.Offline
+        } catch (e: ConnectException) {
+            UpdateCheckOutcome.Offline
+        } catch (e: Exception) {
+            classifyException(e)
         } finally {
             try {
                 connection?.disconnect()
-            } catch (_: Exception) {
-            }
+            } catch (_: Exception) {}
         }
     }
 
@@ -233,9 +268,6 @@ class AppUpdateManager(
         }
     }
 
-    /**
-     * Abre a URL publicada da nova versão para download/instalação no aparelho.
-     */
     fun openUpdateUrl(context: Context, url: String): Boolean {
         return try {
             val targetUrl = url.trim().ifBlank { AppUpdateConfig.FALLBACK_DOWNLOAD_URL }

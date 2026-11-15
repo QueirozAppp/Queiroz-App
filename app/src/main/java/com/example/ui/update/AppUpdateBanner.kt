@@ -166,10 +166,18 @@ fun CheckUpdateSectionCard(
                         fontWeight = FontWeight.Bold,
                         color = AppColors.TextPrimary
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "Versão instalada: ${AppUpdateConfig.APP_VERSION} (Build ${AppUpdateConfig.APP_BUILD})",
                         style = MaterialTheme.typography.bodySmall,
                         color = AppColors.TextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "URL: ${AppUpdateConfig.VERSION_JSON_URL}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AppColors.TextSecondary.copy(alpha = 0.7f),
+                        modifier = Modifier.testTag("text_update_url")
                     )
                 }
             }
