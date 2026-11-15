@@ -23,10 +23,21 @@ object FirebaseProvider {
         } catch (e: Exception) {
             android.util.Log.e("FirebaseProvider", "FirebaseApp.getInstance() failed: ${e.message}")
             try {
-                val app = if (FirebaseApp.getApps(context).isEmpty()) {
-                    FirebaseApp.initializeApp(context)
-                } else {
+                val app = if (FirebaseApp.getApps(context).isNotEmpty()) {
                     FirebaseApp.getApps(context).firstOrNull()
+                } else {
+                    try {
+                        FirebaseApp.initializeApp(context)
+                    } catch (_: Exception) {
+                        val options = com.google.firebase.FirebaseOptions.Builder()
+                            .setProjectId("appqueirozavaria")
+                            .setApplicationId("1:196784493285:android:8d0481125195bbb98bba0c")
+                            .setApiKey("AIzaSyCUMuqPKbD7MC1bzMOnPYRuOeJ9JwdTjCU")
+                            .setStorageBucket("appqueirozavaria.firebasestorage.app")
+                            .setGcmSenderId("196784493285")
+                            .build()
+                        com.google.firebase.FirebaseApp.initializeApp(context, options)
+                    }
                 }
                 if (app != null && BuildConfig.DEBUG) {
                     try {
@@ -38,7 +49,7 @@ object FirebaseProvider {
                 }
                 app != null
             } catch (ex: Exception) {
-                android.util.Log.e("FirebaseProvider", "FirebaseApp.initializeApp(context) failed: ${ex.message}")
+                android.util.Log.e("FirebaseProvider", "Firebase initialization failed: ${ex.message}")
                 false
             }
         }
