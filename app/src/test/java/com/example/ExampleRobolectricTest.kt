@@ -944,9 +944,10 @@ class ExampleRobolectricTest {
 
         var now = 1_000_000L
         var networkCalls = 0
+        val nextBuild = com.example.core.update.AppUpdateConfig.APP_BUILD + 1
         val remoteNewer = com.example.core.update.RemoteVersionInfo(
             version = "1.3.0",
-            build = 13,
+            build = nextBuild,
             notes = "Novidades",
             url = "https://github.com/QueirozAppp/Queiroz-App/releases/latest/download/app-debug.apk"
         )
@@ -961,7 +962,7 @@ class ExampleRobolectricTest {
             }
         )
 
-        // 1. Primeira verificação automática detecta build 13 > 12
+        // 1. Primeira verificação automática detecta build superior ao atual
         val first = kotlinx.coroutines.runBlocking { manager.checkForUpdate(force = false) }
         assertTrue(first is com.example.core.update.UpdateCheckOutcome.UpdateAvailable)
         assertEquals(1, networkCalls)
@@ -973,8 +974,8 @@ class ExampleRobolectricTest {
         assertTrue(within6h is com.example.core.update.UpdateCheckOutcome.UpdateAvailable)
         assertEquals(1, networkCalls)
 
-        // 3. Ao clicar "Depois", esconde automaticamente a versão 13, mas verificação manual força exibição
-        manager.dismissVersion(13)
+        // 3. Ao clicar "Depois", esconde automaticamente a versão atualizada, mas verificação manual força exibição
+        manager.dismissVersion(nextBuild)
         assertFalse(manager.shouldDisplayBanner(remoteNewer, forceShow = false))
         assertTrue(manager.shouldDisplayBanner(remoteNewer, forceShow = true))
 
@@ -1022,6 +1023,13 @@ class ExampleRobolectricTest {
             viewModel.checkManually()
             assertEquals("Sem conexão com a internet. Confira o Wi-Fi.", viewModel.uiState.value.statusMessage)
             assertTrue(viewModel.uiState.value.isStatusError)
+
+            // Parse robusto de version.json (com BOM e build em string) e comparação semântica
+            val parsed = manager.parseVersionJson("\uFEFF{\"version\":\"1.2.1\",\"build\":\"12\",\"notes\":\"Patch\",\"url\":\"https://example.com/a.apk\"}")
+            assertNotNull(parsed)
+            assertEquals("1.2.1", parsed!!.version)
+            assertEquals(12, parsed.build)
+            assertTrue(manager.isNewerVersion(parsed))
         } finally {
             Dispatchers.resetMain()
         }

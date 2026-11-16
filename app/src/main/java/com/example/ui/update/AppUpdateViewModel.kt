@@ -147,7 +147,7 @@ class AppUpdateViewModel(
                         _uiState.update {
                             it.copy(
                                 isChecking = false,
-                                statusMessage = "Arquivo de versão não encontrado no servidor (404). Se o GitHub estiver Privado, altere para Público para o app acessar os releases.",
+                                statusMessage = "Repositório GitHub privado ou arquivo de versão não encontrado (404). Altere o repositório para Público ou publique a versão pela nuvem abaixo.",
                                 isStatusError = true
                             )
                         }
@@ -165,7 +165,7 @@ class AppUpdateViewModel(
                         _uiState.update {
                             it.copy(
                                 isChecking = false,
-                                statusMessage = "O endereço de atualização não devolveu os dados de versão. Confira o arquivo version.json.",
+                                statusMessage = "O servidor retornou uma resposta inválida em vez do version.json. Se o GitHub estiver Privado ou em HTML, publique a atualização na nuvem abaixo.",
                                 isStatusError = true
                             )
                         }

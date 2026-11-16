@@ -19,6 +19,9 @@ android {
     versionCode = 3
     versionName = "1.2"
 
+    val ghRunBuild = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 74
+    buildConfigField("int", "APP_UPDATE_BUILD", ghRunBuild.toString())
+
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 

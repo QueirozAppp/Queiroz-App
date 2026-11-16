@@ -7,7 +7,8 @@ package com.example.core.update
  */
 object AppUpdateConfig {
     const val APP_VERSION: String = "1.2.0"
-    const val APP_BUILD: Int = 12
+    val APP_BUILD: Int
+        get() = com.example.BuildConfig.APP_UPDATE_BUILD
 
     const val GITHUB_VERSION_URL: String =
         "https://raw.githubusercontent.com/QueirozAppp/Queiroz-App/main/version.json"

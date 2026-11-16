@@ -332,24 +332,26 @@ fun CheckUpdateSectionCard(
             }
 
             if (isAdmin && onPublishCloudUpdate != null) {
-                TextButton(
+                OutlinedButton(
                     onClick = { showPublishDialog = true },
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, AppColors.BorderStrong),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 48.dp)
+                        .height(48.dp)
                         .testTag("btn_admin_publish_update")
                 ) {
                     Icon(
                         imageVector = Icons.Default.CloudUpload,
                         contentDescription = null,
                         tint = AppColors.TextPrimary,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(18.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Admin: Publicar nova versão na nuvem",
+                        text = "Publicar atualização na nuvem",
                         color = AppColors.TextPrimary,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }

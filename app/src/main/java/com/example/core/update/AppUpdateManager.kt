@@ -21,7 +21,8 @@ class AppUpdateManager(
     private val currentBuild: Int = AppUpdateConfig.APP_BUILD,
     private val versionUrl: String = AppUpdateConfig.VERSION_JSON_URL,
     private val nowProvider: () -> Long = { System.currentTimeMillis() },
-    private val fetcher: (suspend (String) -> UpdateCheckOutcome)? = null
+    private val fetcher: (suspend (String) -> UpdateCheckOutcome)? = null,
+    private val currentVersion: String = AppUpdateConfig.APP_VERSION
 ) {
     private val appContext = context.applicationContext ?: context
 
@@ -123,8 +124,28 @@ class AppUpdateManager(
         } catch (_: Exception) {}
     }
 
+    internal fun isNewerVersion(info: RemoteVersionInfo): Boolean {
+        if (info.build > currentBuild) return true
+        if (info.build == currentBuild && compareVersions(info.version, currentVersion) > 0) return true
+        return false
+    }
+
+    private fun compareVersions(remote: String, local: String): Int {
+        val rParts = remote.trim().removePrefix("v").removePrefix("V")
+            .split('.', '-', '_').map { it.toIntOrNull() ?: 0 }
+        val lParts = local.trim().removePrefix("v").removePrefix("V")
+            .split('.', '-', '_').map { it.toIntOrNull() ?: 0 }
+        val maxLen = maxOf(rParts.size, lParts.size)
+        for (i in 0 until maxLen) {
+            val r = rParts.getOrElse(i) { 0 }
+            val l = lParts.getOrElse(i) { 0 }
+            if (r != l) return r.compareTo(l)
+        }
+        return 0
+    }
+
     fun shouldDisplayBanner(info: RemoteVersionInfo, forceShow: Boolean = false): Boolean {
-        if (info.build <= currentBuild) return false
+        if (!isNewerVersion(info)) return false
         if (forceShow) return true
         return getDismissedBuild() != info.build
     }
@@ -196,7 +217,7 @@ class AppUpdateManager(
                 } else {
                     // 1. Verificar Firestore primeiro (funciona independente do GitHub ser público ou privado)
                     val firestoreInfo = fetchRemoteVersionFromFirestore()
-                    if (firestoreInfo != null && firestoreInfo.build > currentBuild) {
+                    if (firestoreInfo != null && isNewerVersion(firestoreInfo)) {
                         UpdateCheckOutcome.UpdateAvailable(firestoreInfo)
                     } else {
                         // 2. Verificar HTTP (version.json no GitHub)
@@ -209,18 +230,26 @@ class AppUpdateManager(
                         // 3. Fallback para GitHub Releases API caso version.json não esteja atualizado/público
                         if (netOutcome !is UpdateCheckOutcome.UpdateAvailable) {
                             val releaseOutcome = fetchLatestGitHubRelease(now)
-                            if (releaseOutcome is UpdateCheckOutcome.UpdateAvailable) {
-                                netOutcome = releaseOutcome
-                            } else if (netOutcome is UpdateCheckOutcome.HttpNotFound && releaseOutcome is UpdateCheckOutcome.UpToDate) {
-                                netOutcome = releaseOutcome
+                            when {
+                                releaseOutcome is UpdateCheckOutcome.UpdateAvailable -> {
+                                    netOutcome = releaseOutcome
+                                }
+                                (netOutcome is UpdateCheckOutcome.HttpNotFound || netOutcome is UpdateCheckOutcome.InvalidJson) &&
+                                    releaseOutcome is UpdateCheckOutcome.UpToDate -> {
+                                    netOutcome = releaseOutcome
+                                }
+                                netOutcome is UpdateCheckOutcome.InvalidJson &&
+                                    releaseOutcome is UpdateCheckOutcome.HttpNotFound -> {
+                                    // Se version.json retornou página inválida/bloqueio e release deu 404 (repo privado)
+                                    netOutcome = releaseOutcome
+                                }
                             }
                         }
 
                         if (netOutcome is UpdateCheckOutcome.UpdateAvailable) {
                             netOutcome
                         } else if (firestoreInfo != null) {
-                            // Se Firestore já está configurado e não há build superior no GitHub, respeita status do Firestore
-                            if (firestoreInfo.build > currentBuild) {
+                            if (isNewerVersion(firestoreInfo)) {
                                 UpdateCheckOutcome.UpdateAvailable(firestoreInfo)
                             } else {
                                 UpdateCheckOutcome.UpToDate(firestoreInfo)
@@ -264,6 +293,10 @@ class AppUpdateManager(
             } ?: return@withContext UpdateCheckOutcome.Offline
 
             val code = connection.responseCode
+            if (code == 403 || code == 429) {
+                connection.disconnect()
+                return@withContext fetchLatestReleaseViaRedirect()
+            }
             if (code == 404) return@withContext UpdateCheckOutcome.HttpNotFound(apiUrl)
             if (code !in 200..299) return@withContext UpdateCheckOutcome.HttpError(code)
 
@@ -303,7 +336,49 @@ class AppUpdateManager(
                 notes = notes.ifBlank { releaseName },
                 url = downloadUrl
             )
-            if (remoteInfo.build > currentBuild) {
+            if (isNewerVersion(remoteInfo)) {
+                UpdateCheckOutcome.UpdateAvailable(remoteInfo)
+            } else {
+                UpdateCheckOutcome.UpToDate(remoteInfo)
+            }
+        } catch (_: Exception) {
+            UpdateCheckOutcome.Offline
+        } finally {
+            try {
+                connection?.disconnect()
+            } catch (_: Exception) {}
+        }
+    }
+
+    private suspend fun fetchLatestReleaseViaRedirect(): UpdateCheckOutcome = withContext(Dispatchers.IO) {
+        var connection: HttpURLConnection? = null
+        try {
+            val latestUrl = "https://github.com/QueirozAppp/Queiroz-App/releases/latest"
+            connection = (URL(latestUrl).openConnection() as? HttpURLConnection)?.apply {
+                requestMethod = "HEAD"
+                instanceFollowRedirects = false
+                connectTimeout = AppUpdateConfig.REQUEST_TIMEOUT_MS
+                readTimeout = AppUpdateConfig.REQUEST_TIMEOUT_MS
+                useCaches = false
+                setRequestProperty("User-Agent", "QRZ-Stock-Android-App")
+            } ?: return@withContext UpdateCheckOutcome.Offline
+
+            val code = connection.responseCode
+            if (code == 404) return@withContext UpdateCheckOutcome.HttpNotFound(latestUrl)
+            val location = connection.getHeaderField("Location") ?: return@withContext UpdateCheckOutcome.HttpError(code)
+            val tagName = location.substringAfterLast("/").trim()
+            val cleanVersion = tagName.removePrefix("v").removePrefix("V")
+            val parsedBuild = cleanVersion.split('.', '-', '_').lastOrNull()?.toIntOrNull() ?: 0
+            if (cleanVersion.isBlank() || parsedBuild <= 0) {
+                return@withContext UpdateCheckOutcome.InvalidJson
+            }
+            val remoteInfo = RemoteVersionInfo(
+                version = cleanVersion,
+                build = parsedBuild,
+                notes = "Nova versão disponível no GitHub ($tagName).",
+                url = AppUpdateConfig.FALLBACK_DOWNLOAD_URL
+            )
+            if (isNewerVersion(remoteInfo)) {
                 UpdateCheckOutcome.UpdateAvailable(remoteInfo)
             } else {
                 UpdateCheckOutcome.UpToDate(remoteInfo)
@@ -380,7 +455,7 @@ class AppUpdateManager(
             if (remoteInfo == null) {
                 UpdateCheckOutcome.InvalidJson
             } else {
-                if (remoteInfo.build > currentBuild) {
+                if (isNewerVersion(remoteInfo)) {
                     UpdateCheckOutcome.UpdateAvailable(remoteInfo)
                 } else {
                     UpdateCheckOutcome.UpToDate(remoteInfo)
@@ -403,19 +478,53 @@ class AppUpdateManager(
 
     internal fun parseVersionJson(rawJson: String): RemoteVersionInfo? {
         return try {
-            val obj = JSONObject(rawJson)
-            val version = obj.optString("version", "").trim()
-            val build = obj.optInt("build", -1)
-            val notes = obj.optString("notes", "").trim()
-            val url = obj.optString("url", "").trim()
+            val cleaned = rawJson.trim().removePrefix("\uFEFF")
+            val jsonStart = cleaned.indexOf('{')
+            val jsonEnd = cleaned.lastIndexOf('}')
+            val jsonSlice = if (jsonStart >= 0 && jsonEnd > jsonStart) {
+                cleaned.substring(jsonStart, jsonEnd + 1)
+            } else {
+                cleaned
+            }
+            val obj = JSONObject(jsonSlice)
+            val version = obj.optString("version", "")
+                .ifBlank { obj.optString("versionName", "") }
+                .ifBlank { obj.optString("tag_name", "").removePrefix("v").removePrefix("V") }
+                .trim()
+
+            val rawBuild = when {
+                obj.has("build") -> obj.opt("build")
+                obj.has("buildNumber") -> obj.opt("buildNumber")
+                obj.has("versionCode") -> obj.opt("versionCode")
+                else -> null
+            }
+            val parsedBuild = when (rawBuild) {
+                is Number -> rawBuild.toInt()
+                is String -> rawBuild.trim().toIntOrNull() ?: -1
+                else -> -1
+            }
+            val effectiveBuild = if (parsedBuild > 0) {
+                parsedBuild
+            } else if (version.isNotBlank()) {
+                currentBuild // Permite comparação semântica por version se build foi omitido
+            } else {
+                -1
+            }
+
+            val notes = obj.optString("notes", "")
+                .ifBlank { obj.optString("releaseNotes", "") }
+                .trim()
+            val url = obj.optString("url", "")
+                .ifBlank { obj.optString("downloadUrl", "") }
+                .trim()
                 .ifBlank { AppUpdateConfig.FALLBACK_DOWNLOAD_URL }
 
-            if (version.isBlank() || build <= 0) {
+            if (version.isBlank() || effectiveBuild <= 0) {
                 null
             } else {
                 RemoteVersionInfo(
                     version = version,
-                    build = build,
+                    build = effectiveBuild,
                     notes = notes,
                     url = url
                 )
