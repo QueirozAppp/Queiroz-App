@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.core.data.ProductRegistrationRepository
 import com.example.core.model.ProductRegistrationRequest
+import com.example.core.model.ProductRequestStatus
 import com.example.core.model.UserProfile
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,16 +21,35 @@ class ProductApprovalViewModel(
     val uiState: StateFlow<ProductApprovalUiState> = _uiState.asStateFlow()
 
     private var allRequests: List<ProductRegistrationRequest> = emptyList()
+    private var loadJob: Job? = null
 
     fun loadRequests(userProfile: UserProfile) {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            launch {
+                val fresh = repository.refreshRequests(userProfile)
+                updateRequestsSnapshot(fresh)
+            }
             repository.getRequestsFlow(userProfile).collect { list ->
-                allRequests = list
-                val pending = list.count { it.status == "PENDING" }
-                _uiState.update { it.copy(pendingCount = pending) }
-                applyFilter(_uiState.value.filterStatus)
+                updateRequestsSnapshot(list)
             }
         }
+    }
+
+    fun refreshRequests(userProfile: UserProfile) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val fresh = repository.refreshRequests(userProfile)
+            updateRequestsSnapshot(fresh)
+            _uiState.update { it.copy(isLoading = false) }
+        }
+    }
+
+    private fun updateRequestsSnapshot(list: List<ProductRegistrationRequest>) {
+        allRequests = list
+        val pending = list.count { it.status == ProductRequestStatus.PENDING.name }
+        _uiState.update { it.copy(pendingCount = pending) }
+        applyFilter(_uiState.value.filterStatus)
     }
 
     fun onFilterStatusChanged(status: String) {
@@ -103,6 +124,23 @@ class ProductApprovalViewModel(
 
             result.fold(
                 onSuccess = {
+                    val now = System.currentTimeMillis()
+                    val reviewerName = reviewerProfile.name.ifEmpty { reviewerProfile.email }
+                    val updatedList = allRequests.map { item ->
+                        if (item.id == request.id) {
+                            item.copy(
+                                status = ProductRequestStatus.APPROVED.name,
+                                barcode = barcode,
+                                name = name,
+                                unit = unit,
+                                price = price,
+                                reviewedByUid = reviewerProfile.uid,
+                                reviewedByName = reviewerName,
+                                reviewedAt = now
+                            )
+                        } else item
+                    }
+                    updateRequestsSnapshot(updatedList)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -110,6 +148,7 @@ class ProductApprovalViewModel(
                             successMessage = "Produto '${name}' aprovado e adicionado ao catálogo global com sucesso!"
                         )
                     }
+                    refreshRequests(reviewerProfile)
                 },
                 onFailure = { err ->
                     _uiState.update {
@@ -160,6 +199,20 @@ class ProductApprovalViewModel(
 
             result.fold(
                 onSuccess = {
+                    val now = System.currentTimeMillis()
+                    val reviewerName = reviewerProfile.name.ifEmpty { reviewerProfile.email }
+                    val updatedList = allRequests.map { item ->
+                        if (item.id == request.id) {
+                            item.copy(
+                                status = ProductRequestStatus.REJECTED.name,
+                                rejectionReason = reason,
+                                reviewedByUid = reviewerProfile.uid,
+                                reviewedByName = reviewerName,
+                                reviewedAt = now
+                            )
+                        } else item
+                    }
+                    updateRequestsSnapshot(updatedList)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -168,6 +221,7 @@ class ProductApprovalViewModel(
                             successMessage = "Solicitação de cadastro recusada."
                         )
                     }
+                    refreshRequests(reviewerProfile)
                 },
                 onFailure = { err ->
                     _uiState.update {

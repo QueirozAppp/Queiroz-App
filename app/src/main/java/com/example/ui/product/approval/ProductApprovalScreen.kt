@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -346,6 +347,18 @@ fun ProductApprovalScreen(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = "Voltar",
                             tint = AppColors.TextPrimary
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = { viewModel.refreshRequests(userProfile) },
+                        modifier = Modifier.testTag("btn_refresh_product_approvals")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Atualizar Solicitações",
+                            tint = AppColors.Primary
                         )
                     }
                 },

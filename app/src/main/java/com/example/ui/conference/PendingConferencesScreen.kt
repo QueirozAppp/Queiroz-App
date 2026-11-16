@@ -44,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.core.data.WithdrawalRequestRepository
 import com.example.core.model.UserProfile
@@ -205,10 +206,13 @@ private fun PendingConferenceCard(
             Column(modifier = Modifier.weight(1f)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
                         Box(
                             modifier = Modifier
                                 .size(32.dp)
@@ -227,7 +231,9 @@ private fun PendingConferenceCard(
                             text = "Solicitação #${request.id.take(6).uppercase()}",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = AppColors.TextPrimary
+                            color = AppColors.TextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                     AppStatusBadge(status = request.status)
@@ -237,18 +243,24 @@ private fun PendingConferenceCard(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = "Setor: ${request.sectorId.ifEmpty { "Geral" }} • ${request.requestedByName}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = AppColors.TextSecondary
+                        color = AppColors.TextSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
                     )
                     Text(
                         text = "${request.items.size} produto(s)",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = AppColors.Primary
+                        color = AppColors.Primary,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
 

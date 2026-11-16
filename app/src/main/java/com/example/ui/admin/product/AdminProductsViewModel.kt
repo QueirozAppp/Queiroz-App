@@ -2,6 +2,7 @@ package com.example.ui.admin.product
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.core.data.ProductRegistrationRepository
 import com.example.core.data.ProductRepository
 import com.example.core.firebase.FirebaseProvider
 import com.example.core.model.Product
@@ -15,7 +16,8 @@ import kotlinx.coroutines.launch
  * ViewModel para gerenciar a listagem, pesquisa, cadastro e ativação/desativação de produtos no Catálogo Global (Etapa 5.1).
  */
 class AdminProductsViewModel(
-    private val productRepository: ProductRepository = ProductRepository()
+    private val productRepository: ProductRepository = ProductRepository(),
+    private val productRegistrationRepository: ProductRegistrationRepository = ProductRegistrationRepository(productRepository)
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AdminProductsUiState(isLoading = false))
@@ -418,6 +420,18 @@ class AdminProductsViewModel(
             )
             result.fold(
                 onSuccess = { createdId ->
+                    val authorProfile = state.userProfile
+                    if (authorProfile != null) {
+                        productRegistrationRepository.recordDirectRegistration(
+                            productId = createdId,
+                            barcode = trimmedBarcode,
+                            name = trimmedName,
+                            price = parsedPrice,
+                            unit = state.newUnit,
+                            photoBase64 = state.newPhotoBase64,
+                            userProfile = authorProfile
+                        )
+                    }
                     val now = System.currentTimeMillis()
                     val immediateProduct = Product(
                         id = createdId,

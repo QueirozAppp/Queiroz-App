@@ -686,6 +686,8 @@ fun HomeAuthenticatedScreen(
                         statusMessage = updateUiState.statusMessage,
                         isStatusError = updateUiState.isStatusError,
                         onCheckForUpdateClick = onCheckForUpdate,
+                        availableUpdate = updateUiState.availableUpdate,
+                        onUpdateNowClick = onUpdateNow,
                         isAdmin = userProfile.role == UserRole.ADMIN,
                         onPublishCloudUpdate = onPublishCloudUpdate
                     )

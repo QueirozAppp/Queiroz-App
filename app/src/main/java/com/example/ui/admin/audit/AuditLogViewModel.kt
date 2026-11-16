@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.core.data.AuditRepository
 import com.example.core.data.StoreSectorRepository
 import com.example.core.model.AuditLog
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +22,7 @@ class AuditLogViewModel(
 
     private val _uiState = MutableStateFlow(AuditLogUiState())
     val uiState: StateFlow<AuditLogUiState> = _uiState.asStateFlow()
+    private var fetchJob: Job? = null
 
     init {
         loadStores()
@@ -36,7 +38,8 @@ class AuditLogViewModel(
     }
 
     fun loadInitialLogs() {
-        viewModelScope.launch {
+        fetchJob?.cancel()
+        fetchJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             val result = auditRepository.fetchAuditLogs(
                 limitCount = 30,

@@ -34,7 +34,9 @@ class ProductRegistrationRepository(
         private const val CATALOG_DOC_ID = "__GLOBAL_CATALOG__"
         private const val SUBCOLLECTION_EVIDENCE = "evidence"
         private const val DOC_TYPE_REG_REQUEST = "PRODUCT_REQUEST"
+        private const val DOC_TYPE_GLOBAL_PRODUCT = "GLOBAL_PRODUCT"
         private const val REQUESTS_STORE_KEY = "__PRODUCT_REG_REQUESTS__"
+        private const val GLOBAL_PRODUCTS_STORE_KEY = "__GLOBAL_PRODUCTS__"
 
         @Volatile
         private var memoryCache: List<ProductRegistrationRequest> = emptyList()
@@ -44,18 +46,30 @@ class ProductRegistrationRepository(
         }
     }
 
+    private fun parseTimeMillis(raw: Any?): Long {
+        return when (raw) {
+            is Number -> raw.toLong()
+            is com.google.firebase.Timestamp -> raw.toDate().time
+            else -> 0L
+        }
+    }
+
     private fun parseRequest(doc: DocumentSnapshot): ProductRegistrationRequest? {
         return try {
             val data = doc.data ?: return null
+            if ((data["deleted"] as? Boolean) == true) return null
             val rawId = (data["requestId"] as? String)?.takeIf { it.isNotBlank() }
+                ?: (data["productId"] as? String)?.takeIf { it.isNotBlank() }
                 ?: (data["id"] as? String)?.takeIf { it.isNotBlank() }
-                ?: doc.id.removePrefix("req_")
+                ?: doc.id.removePrefix("req_").removePrefix("prod_")
             val name = (data["name"] as? String) ?: ""
             if (name.isBlank()) return null
 
             val realStoreId = (data["originalStoreId"] as? String)?.takeIf { it.isNotBlank() }
-                ?: (data["storeId"] as? String)?.takeIf { it != REQUESTS_STORE_KEY }
-                ?: ""
+                ?: (data["storeId"] as? String)?.takeIf {
+                    it != REQUESTS_STORE_KEY && it != GLOBAL_PRODUCTS_STORE_KEY
+                }
+                ?: "GLOBAL"
 
             val price = when (val p = data["price"]) {
                 is Number -> p.toDouble()
@@ -63,24 +77,39 @@ class ProductRegistrationRepository(
                 else -> 0.0
             }
 
+            val reviewedAt = parseTimeMillis(data["reviewedAt"]).let {
+                if (it > 0L) it else parseTimeMillis(data["updatedAt"])
+            }
+            val requestedAt = parseTimeMillis(data["requestedAt"]).let {
+                if (it > 0L) it else parseTimeMillis(data["createdAt"]).let { c ->
+                    if (c > 0L) c else reviewedAt
+                }
+            }
+
+            val isGlobalProductDoc = (data["docType"] as? String) == DOC_TYPE_GLOBAL_PRODUCT ||
+                (data["storeId"] as? String) == GLOBAL_PRODUCTS_STORE_KEY
+
+            val status = (data["status"] as? String)?.takeIf { it.isNotBlank() }
+                ?: if (isGlobalProductDoc) ProductRequestStatus.APPROVED.name else ProductRequestStatus.PENDING.name
+
             ProductRegistrationRequest(
                 id = rawId,
                 barcode = (data["barcode"] as? String) ?: "",
                 name = name,
                 price = price,
                 unit = (data["unit"] as? String)?.takeIf { it.isNotBlank() } ?: "UN",
-                photoBase64 = (data["photoBase64"] as? String) ?: "",
+                photoBase64 = (data["photoBase64"] as? String) ?: (data["photoUrl"] as? String) ?: "",
                 storeId = realStoreId,
-                sectorId = (data["sectorId"] as? String) ?: "Geral",
+                sectorId = (data["sectorId"] as? String)?.takeIf { it.isNotBlank() } ?: "Geral",
                 requestedByUid = (data["requestedByUid"] as? String) ?: "",
-                requestedByName = (data["requestedByName"] as? String) ?: "",
-                requestedAt = (data["requestedAt"] as? Number)?.toLong() ?: 0L,
-                status = (data["status"] as? String)?.takeIf { it.isNotBlank() }
-                    ?: ProductRequestStatus.PENDING.name,
+                requestedByName = (data["requestedByName"] as? String)?.takeIf { it.isNotBlank() }
+                    ?: if (isGlobalProductDoc) "Catálogo Global" else "",
+                requestedAt = requestedAt,
+                status = status,
                 rejectionReason = (data["rejectionReason"] as? String) ?: "",
                 reviewedByUid = (data["reviewedByUid"] as? String) ?: "",
                 reviewedByName = (data["reviewedByName"] as? String) ?: "",
-                reviewedAt = (data["reviewedAt"] as? Number)?.toLong() ?: 0L
+                reviewedAt = reviewedAt
             )
         } catch (e: Exception) {
             android.util.Log.w("ProductRegRepo", "Erro ao converter solicitação ${doc.id}: ${e.message}")
@@ -88,7 +117,10 @@ class ProductRegistrationRepository(
         }
     }
 
-    private fun mergeRequests(vararg sources: List<ProductRegistrationRequest>): List<ProductRegistrationRequest> {
+    private fun mergeRequests(
+        vararg sources: List<ProductRegistrationRequest>,
+        catalogApprovedFallback: List<ProductRegistrationRequest> = emptyList()
+    ): List<ProductRegistrationRequest> {
         val map = linkedMapOf<String, ProductRegistrationRequest>()
         for (source in sources) {
             for (item in source) {
@@ -107,7 +139,28 @@ class ProductRegistrationRepository(
                 }
             }
         }
-        return map.values.sortedByDescending { it.requestedAt }
+
+        if (catalogApprovedFallback.isNotEmpty()) {
+            val existingIds = map.keys.toSet()
+            val existingBarcodes = map.values
+                .mapNotNull { it.barcode.trim().takeIf { b -> b.isNotBlank() } }
+                .toSet()
+            val existingNames = map.values
+                .filter { it.status == ProductRequestStatus.APPROVED.name }
+                .map { it.name.trim().lowercase() }
+                .toSet()
+
+            for (item in catalogApprovedFallback) {
+                if (item.id.isBlank() || item.name.isBlank()) continue
+                if (item.id in existingIds) continue
+                val cleanBarcode = item.barcode.trim()
+                if (cleanBarcode.isNotBlank() && cleanBarcode in existingBarcodes) continue
+                if (cleanBarcode.isBlank() && item.name.trim().lowercase() in existingNames) continue
+                map[item.id] = item
+            }
+        }
+
+        return map.values.sortedByDescending { maxOf(it.reviewedAt, it.requestedAt) }
     }
 
     /**
@@ -285,6 +338,10 @@ class ProductRegistrationRepository(
             "reviewedAt" to now
         )
         try {
+            db.collection(COLLECTION_REQUESTS).document(productId)
+                .set(mirrorMap + mapOf("storeId" to entry.storeId), SetOptions.merge()).await()
+        } catch (_: Exception) {}
+        try {
             db.collection(COLLECTION_CLOUD_FALLBACK).document("req_$productId")
                 .set(mirrorMap, SetOptions.merge()).await()
         } catch (_: Exception) {}
@@ -311,7 +368,10 @@ class ProductRegistrationRepository(
             }
             UserRole.AVARISTA -> {
                 list.filter {
-                    it.storeId == userProfile.storeId || it.storeId == "GLOBAL" || it.storeId.isBlank()
+                    it.storeId == userProfile.storeId ||
+                        it.storeId == "GLOBAL" ||
+                        it.storeId.isBlank() ||
+                        it.status == ProductRequestStatus.APPROVED.name
                 }
             }
             UserRole.ADMIN -> list
@@ -320,7 +380,71 @@ class ProductRegistrationRepository(
         if (!filterStatus.isNullOrBlank() && filterStatus != "ALL") {
             result = result.filter { it.status == filterStatus }
         }
-        return result.sortedByDescending { it.requestedAt }
+        return result.sortedByDescending { maxOf(it.reviewedAt, it.requestedAt) }
+    }
+
+    /**
+     * Consulta direta em todas as fontes em nuvem (incluindo catálogo global) para atualizar imediatamente a tela.
+     */
+    suspend fun refreshRequests(
+        userProfile: UserProfile,
+        filterStatus: String? = null
+    ): List<ProductRegistrationRequest> {
+        val db = firestore
+        if (db == null || FirebaseProvider.getAuthOrNull()?.currentUser == null) {
+            return filterByRole(memoryCache, userProfile, filterStatus)
+        }
+
+        val primaryItems = try {
+            db.collection(COLLECTION_REQUESTS).get().await()
+                .documents.mapNotNull { parseRequest(it) }
+        } catch (_: Exception) { emptyList() }
+
+        val fallbackItems = try {
+            db.collection(COLLECTION_CLOUD_FALLBACK)
+                .whereEqualTo("storeId", REQUESTS_STORE_KEY)
+                .get().await()
+                .documents.mapNotNull { parseRequest(it) }
+        } catch (_: Exception) { emptyList() }
+
+        val evidenceItems = try {
+            db.collection(COLLECTION_WITHDRAWAL)
+                .document(CATALOG_DOC_ID)
+                .collection(SUBCOLLECTION_EVIDENCE)
+                .whereEqualTo("docType", DOC_TYPE_REG_REQUEST)
+                .get().await()
+                .documents.mapNotNull { parseRequest(it) }
+        } catch (_: Exception) { emptyList() }
+
+        val catalogFallbackProducts = try {
+            productRepository.getAllProducts().getOrNull().orEmpty().map { prod ->
+                ProductRegistrationRequest(
+                    id = prod.id,
+                    barcode = prod.barcode,
+                    name = prod.name,
+                    price = prod.price,
+                    unit = prod.unit,
+                    photoBase64 = prod.photoBase64,
+                    storeId = "GLOBAL",
+                    sectorId = "Geral",
+                    requestedByName = "Catálogo Global",
+                    requestedAt = prod.createdAt.takeIf { it > 0L } ?: prod.updatedAt,
+                    status = ProductRequestStatus.APPROVED.name,
+                    reviewedByName = "Catálogo Global",
+                    reviewedAt = prod.updatedAt.takeIf { it > 0L } ?: prod.createdAt
+                )
+            }
+        } catch (_: Exception) { emptyList() }
+
+        val merged = mergeRequests(
+            primaryItems,
+            fallbackItems,
+            evidenceItems,
+            memoryCache,
+            catalogApprovedFallback = catalogFallbackProducts
+        )
+        memoryCache = merged
+        return filterByRole(merged, userProfile, filterStatus)
     }
 
     /**
@@ -340,9 +464,18 @@ class ProductRegistrationRepository(
         var primaryItems: List<ProductRegistrationRequest> = emptyList()
         var fallbackItems: List<ProductRegistrationRequest> = emptyList()
         var evidenceItems: List<ProductRegistrationRequest> = emptyList()
+        var globalFallbackProducts: List<ProductRegistrationRequest> = emptyList()
+        var globalEvidenceProducts: List<ProductRegistrationRequest> = emptyList()
 
         fun emitMerged() {
-            val merged = mergeRequests(primaryItems, fallbackItems, evidenceItems, memoryCache)
+            val catalogMerged = (globalFallbackProducts + globalEvidenceProducts)
+            val merged = mergeRequests(
+                primaryItems,
+                fallbackItems,
+                evidenceItems,
+                memoryCache,
+                catalogApprovedFallback = catalogMerged
+            )
             memoryCache = merged
             trySend(filterByRole(merged, userProfile, filterStatus))
         }
@@ -350,6 +483,8 @@ class ProductRegistrationRepository(
         var primaryListener: ListenerRegistration? = null
         var fallbackListener: ListenerRegistration? = null
         var evidenceListener: ListenerRegistration? = null
+        var globalFallbackListener: ListenerRegistration? = null
+        var globalEvidenceListener: ListenerRegistration? = null
 
         try {
             primaryListener = db.collection(COLLECTION_REQUESTS)
@@ -385,12 +520,38 @@ class ProductRegistrationRepository(
                 }
         } catch (_: Exception) {}
 
+        try {
+            globalFallbackListener = db.collection(COLLECTION_CLOUD_FALLBACK)
+                .whereEqualTo("storeId", GLOBAL_PRODUCTS_STORE_KEY)
+                .addSnapshotListener { snapshot, error ->
+                    if (error == null && snapshot != null) {
+                        globalFallbackProducts = snapshot.documents.mapNotNull { parseRequest(it) }
+                        emitMerged()
+                    }
+                }
+        } catch (_: Exception) {}
+
+        try {
+            globalEvidenceListener = db.collection(COLLECTION_WITHDRAWAL)
+                .document(CATALOG_DOC_ID)
+                .collection(SUBCOLLECTION_EVIDENCE)
+                .whereEqualTo("docType", DOC_TYPE_GLOBAL_PRODUCT)
+                .addSnapshotListener { snapshot, error ->
+                    if (error == null && snapshot != null) {
+                        globalEvidenceProducts = snapshot.documents.mapNotNull { parseRequest(it) }
+                        emitMerged()
+                    }
+                }
+        } catch (_: Exception) {}
+
         emitMerged()
 
         awaitClose {
             primaryListener?.remove()
             fallbackListener?.remove()
             evidenceListener?.remove()
+            globalFallbackListener?.remove()
+            globalEvidenceListener?.remove()
         }
     }
 
@@ -501,17 +662,26 @@ class ProductRegistrationRepository(
                 price = finalPrice,
                 unit = finalUnit,
                 photoBase64 = request.photoBase64,
-                reviewerProfile = reviewerProfile
+                reviewerProfile = reviewerProfile,
+                skipRequestMirror = true
             )
             val productId = upsertResult.getOrElse { return Result.failure(it) }
 
-            // 2. Atualizar status da solicitação como APPROVED nos canais disponíveis
-            val updatePayload = mapOf(
+            // 2. Atualizar status da solicitação como APPROVED nos canais disponíveis com metadados completos
+            val updatePayload = hashMapOf<String, Any>(
+                "id" to request.id,
+                "requestId" to request.id,
                 "status" to ProductRequestStatus.APPROVED.name,
                 "barcode" to finalBarcode,
                 "name" to finalName,
                 "unit" to finalUnit,
                 "price" to finalPrice,
+                "photoBase64" to request.photoBase64,
+                "originalStoreId" to request.storeId.ifBlank { "GLOBAL" },
+                "sectorId" to request.sectorId.ifBlank { "Geral" },
+                "requestedByUid" to request.requestedByUid,
+                "requestedByName" to request.requestedByName,
+                "requestedAt" to (if (request.requestedAt > 0L) request.requestedAt else now),
                 "reviewedByUid" to reviewerProfile.uid,
                 "reviewedByName" to reviewerName,
                 "reviewedAt" to now
@@ -519,12 +689,12 @@ class ProductRegistrationRepository(
 
             try {
                 db.collection(COLLECTION_REQUESTS).document(request.id)
-                    .set(updatePayload, SetOptions.merge()).await()
+                    .set(updatePayload + mapOf("storeId" to request.storeId.ifBlank { "GLOBAL" }), SetOptions.merge()).await()
             } catch (_: Exception) {}
 
             try {
                 db.collection(COLLECTION_CLOUD_FALLBACK).document("req_${request.id}")
-                    .set(updatePayload + mapOf("storeId" to REQUESTS_STORE_KEY), SetOptions.merge()).await()
+                    .set(updatePayload + mapOf("storeId" to REQUESTS_STORE_KEY, "docType" to DOC_TYPE_REG_REQUEST), SetOptions.merge()).await()
             } catch (_: Exception) {}
 
             try {

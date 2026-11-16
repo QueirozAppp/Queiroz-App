@@ -535,15 +535,35 @@ class AppUpdateManager(
     }
 
     fun openUpdateUrl(context: Context, url: String): Boolean {
+        val raw = url.trim().ifBlank { AppUpdateConfig.FALLBACK_DOWNLOAD_URL }
+        val targetUrl = if (raw.startsWith("http://", ignoreCase = true) || raw.startsWith("https://", ignoreCase = true)) {
+            raw
+        } else {
+            AppUpdateConfig.FALLBACK_DOWNLOAD_URL
+        }
         return try {
-            val targetUrl = url.trim().ifBlank { AppUpdateConfig.FALLBACK_DOWNLOAD_URL }
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
             true
         } catch (_: Exception) {
-            false
+            if (targetUrl != AppUpdateConfig.FALLBACK_DOWNLOAD_URL) {
+                try {
+                    val fallbackIntent = Intent(
+                        Intent.ACTION_VIEW,
+                        Uri.parse(AppUpdateConfig.FALLBACK_DOWNLOAD_URL)
+                    ).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(fallbackIntent)
+                    true
+                } catch (_: Exception) {
+                    false
+                }
+            } else {
+                false
+            }
         }
     }
 }

@@ -129,6 +129,7 @@ fun AppUpdateBanner(
                     Icon(
                         imageVector = Icons.Default.CloudDownload,
                         contentDescription = null,
+                        tint = Color.White,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
@@ -149,6 +150,8 @@ fun CheckUpdateSectionCard(
     isStatusError: Boolean,
     onCheckForUpdateClick: () -> Unit,
     modifier: Modifier = Modifier,
+    availableUpdate: RemoteVersionInfo? = null,
+    onUpdateNowClick: (() -> Unit)? = null,
     isAdmin: Boolean = false,
     onPublishCloudUpdate: ((version: String, build: Int, notes: String, url: String) -> Unit)? = null
 ) {
@@ -298,6 +301,40 @@ fun CheckUpdateSectionCard(
                             modifier = Modifier.testTag("text_update_status_message")
                         )
                     }
+                }
+            }
+
+            if (availableUpdate != null && onUpdateNowClick != null) {
+                if (availableUpdate.notes.isNotBlank()) {
+                    Text(
+                        text = availableUpdate.notes,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AppColors.TextSecondary,
+                        modifier = Modifier.testTag("text_card_update_notes")
+                    )
+                }
+
+                Button(
+                    onClick = onUpdateNowClick,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .testTag("btn_card_download_update")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CloudDownload,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Baixar versão ${availableUpdate.version}",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
                 }
             }
 

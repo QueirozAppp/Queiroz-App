@@ -86,6 +86,10 @@ fun AuditLogScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showFiltersDialog by remember { mutableStateOf(false) }
 
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.loadInitialLogs()
+    }
+
     BackHandler(enabled = true) {
         onBackToHome()
     }
@@ -240,6 +244,25 @@ fun AuditLogScreen(
             Spacer(modifier = Modifier.height(10.dp))
 
             // Loading / Error states
+            if (!uiState.errorMessage.isNullOrBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = AppColors.StatusDivergenceBg,
+                    border = BorderStroke(1.dp, AppColors.StatusDivergence.copy(alpha = 0.3f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 10.dp)
+                ) {
+                    Text(
+                        text = uiState.errorMessage ?: "",
+                        color = AppColors.StatusDivergenceText,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
+
             if (uiState.isLoading && uiState.logs.isEmpty()) {
                 AppLoadingView(message = "Carregando registros imutáveis de auditoria...")
             } else if (uiState.filteredLogs.isEmpty()) {
@@ -550,7 +573,7 @@ private fun AuditFiltersDialog(
     onDismiss: () -> Unit
 ) {
     val roles = listOf("ALL", "ADMIN", "AVARISTA", "SETOR_LEADER")
-    val entityTypes = listOf("ALL", AuditEntityType.WITHDRAWAL_REQUEST, AuditEntityType.EVIDENCE, AuditEntityType.USER, AuditEntityType.STORE, AuditEntityType.SECTOR, AuditEntityType.PRODUCT)
+    val entityTypes = listOf("ALL", AuditEntityType.WITHDRAWAL_REQUEST, AuditEntityType.EVIDENCE, AuditEntityType.USER, AuditEntityType.STORE, AuditEntityType.SECTOR, AuditEntityType.PRODUCT, AuditEntityType.PRODUCT_REQUEST)
 
     AlertDialog(
         onDismissRequest = onDismiss,

@@ -20,7 +20,7 @@ import java.io.File
  */
 object ImageCompressionUtils {
 
-    private const val MAX_FIRESTORE_BINARY_BYTES = 735_000 // ~980 KB em Base64 (abaixo do limite de 1 MB do Firestore)
+    private const val MAX_FIRESTORE_BINARY_BYTES = 660_000 // ~880 KB em Base64 (folga segura abaixo de 1 MB do Firestore)
     private const val MAX_STORAGE_BINARY_BYTES = 8_500_000 // Limite seguro abaixo dos 10 MB do Storage
 
     /**
@@ -202,15 +202,13 @@ object ImageCompressionUtils {
         } while (bytes.size > maxBytes && currentQuality >= 72)
 
         // Fallback seguro caso a foto 12MP+ seja muito densa: reduz levemente a dimensão para garantir caber no Firestore
-        var safetyScale = 0.85f
-        while (bytes.size > maxBytes && workingBitmap.width > 640 && workingBitmap.height > 640 && safetyScale >= 0.4f) {
+        while (bytes.size > maxBytes && workingBitmap.width > 480 && workingBitmap.height > 480) {
             val nextW = (workingBitmap.width * 0.85f).toInt().coerceAtLeast(1)
             val nextH = (workingBitmap.height * 0.85f).toInt().coerceAtLeast(1)
             workingBitmap = Bitmap.createScaledBitmap(workingBitmap, nextW, nextH, true)
             val outputStream = ByteArrayOutputStream()
-            workingBitmap.compress(Bitmap.CompressFormat.JPEG, 78, outputStream)
+            workingBitmap.compress(Bitmap.CompressFormat.JPEG, 76, outputStream)
             bytes = outputStream.toByteArray()
-            safetyScale -= 0.15f
         }
 
         return Base64.encodeToString(bytes, Base64.NO_WRAP)

@@ -462,7 +462,8 @@ class ProductRepository(
     private suspend fun persistProductToCloud(
         db: FirebaseFirestore,
         product: Product,
-        userProfile: UserProfile?
+        userProfile: UserProfile?,
+        skipRequestMirror: Boolean = false
     ): Boolean {
         var anySucceeded = false
         val now = System.currentTimeMillis()
@@ -480,7 +481,8 @@ class ProductRepository(
         }
 
         // Canal 2: Coleção 'productRegistrationRequests' (status APPROVED)
-        try {
+        if (!skipRequestMirror) {
+            try {
             val approvedData = hashMapOf(
                 "id" to product.id,
                 "barcode" to product.barcode,
@@ -500,10 +502,11 @@ class ProductRepository(
                 "active" to product.active,
                 "updatedAt" to now
             )
-            db.collection(COLLECTION_REQUESTS).document(product.id).set(approvedData, SetOptions.merge()).await()
-            anySucceeded = true
-        } catch (ex: Exception) {
-            android.util.Log.w("ProductRepository", "Canal 'productRegistrationRequests' indisponível: ${ex.message}")
+                db.collection(COLLECTION_REQUESTS).document(product.id).set(approvedData, SetOptions.merge()).await()
+                anySucceeded = true
+            } catch (ex: Exception) {
+                android.util.Log.w("ProductRepository", "Canal 'productRegistrationRequests' indisponível: ${ex.message}")
+            }
         }
 
         val fallbackData = hashMapOf(
@@ -622,7 +625,8 @@ class ProductRepository(
         price: Double,
         unit: String,
         photoBase64: String,
-        reviewerProfile: UserProfile
+        reviewerProfile: UserProfile,
+        skipRequestMirror: Boolean = false
     ): Result<String> {
         val db = firestore ?: return Result.failure(IllegalStateException("Firestore não inicializado."))
         val now = System.currentTimeMillis()
@@ -654,7 +658,7 @@ class ProductRepository(
             updatedAt = now
         )
 
-        val saved = persistProductToCloud(db, product, reviewerProfile)
+        val saved = persistProductToCloud(db, product, reviewerProfile, skipRequestMirror = skipRequestMirror)
         if (!saved) {
             return Result.failure(IllegalStateException("Erro ao publicar o produto aprovado no catálogo."))
         }
