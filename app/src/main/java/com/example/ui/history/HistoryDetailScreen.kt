@@ -58,6 +58,7 @@ fun HistoryDetailScreen(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = AppColors.Surface,
         title = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -168,7 +169,7 @@ fun HistoryDetailScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
                 modifier = Modifier.testTag("btn_close_history_detail")
             ) {
-                Text("Fechar", fontWeight = FontWeight.Bold)
+                Text("Fechar", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
     )

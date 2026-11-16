@@ -73,7 +73,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -83,6 +85,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import com.example.core.model.Product
 import com.example.core.util.ImageCompressionUtils
@@ -129,9 +133,8 @@ fun ProductDetailBottomSheet(
     ) { uri: Uri? ->
         if (uri != null) {
             try {
-                val bitmap = ImageCompressionUtils.decodeScaledBitmapFromUri(context, uri)
-                if (bitmap != null) {
-                    val base64 = ImageCompressionUtils.resizeAndCompressBitmap(bitmap)
+                val base64 = ImageCompressionUtils.readImageToHighQualityBase64(context, uri)
+                if (!base64.isNullOrBlank()) {
                     onEditPhotoCaptured(base64)
                 } else {
                     Toast.makeText(context, "Erro ao decodificar imagem.", Toast.LENGTH_SHORT).show()
@@ -142,16 +145,33 @@ fun ProductDetailBottomSheet(
         }
     }
 
+    var pendingCameraPhotoUri by remember { mutableStateOf<Uri?>(null) }
+
     val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicturePreview()
-    ) { bitmap: Bitmap? ->
-        if (bitmap != null) {
+        contract = ActivityResultContracts.TakePicture()
+    ) { success: Boolean ->
+        val uri = pendingCameraPhotoUri
+        if (success && uri != null) {
             try {
-                val base64 = resizeAndCompressBitmap(bitmap)
-                onEditPhotoCaptured(base64)
+                val base64 = ImageCompressionUtils.readImageToHighQualityBase64(context, uri)
+                if (!base64.isNullOrBlank()) {
+                    onEditPhotoCaptured(base64)
+                } else {
+                    Toast.makeText(context, "Erro ao processar imagem.", Toast.LENGTH_SHORT).show()
+                }
             } catch (e: Exception) {
                 Toast.makeText(context, "Falha ao processar foto: ${e.message}", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    fun launchCameraDirectly() {
+        try {
+            val uri = ImageCompressionUtils.createCameraPhotoUri(context)
+            pendingCameraPhotoUri = uri
+            cameraLauncher.launch(uri)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Falha ao acionar câmera em alta resolução: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -159,7 +179,7 @@ fun ProductDetailBottomSheet(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            cameraLauncher.launch(null)
+            launchCameraDirectly()
         } else {
             Toast.makeText(context, "Permissão de câmera negada.", Toast.LENGTH_SHORT).show()
         }
@@ -171,7 +191,7 @@ fun ProductDetailBottomSheet(
             Manifest.permission.CAMERA
         ) == PackageManager.PERMISSION_GRANTED
         if (hasPermission) {
-            cameraLauncher.launch(null)
+            launchCameraDirectly()
         } else {
             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
@@ -319,15 +339,63 @@ private fun ViewProductDetailContent(
     val photoBitmap = remember(product.photoBase64) {
         ImageCompressionUtils.decodeBase64ToImageBitmap(product.photoBase64)
     }
+    var showFullPhoto by remember { mutableStateOf(false) }
+
+    if (showFullPhoto && photoBitmap != null) {
+        Dialog(
+            onDismissRequest = { showFullPhoto = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = AppColors.Surface,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 24.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = product.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = AppColors.TextPrimary
+                    )
+                    Image(
+                        bitmap = photoBitmap,
+                        contentDescription = "Foto ampliada do produto ${product.name}",
+                        contentScale = ContentScale.Fit,
+                        filterQuality = FilterQuality.High,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 240.dp, max = 520.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                    )
+                    Button(
+                        onClick = { showFullPhoto = false },
+                        colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                    ) {
+                        Text("Fechar", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
 
     // Exibição da Foto do Produto
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(200.dp)
+            .height(220.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(AppColors.SurfaceElevated)
-            .border(BorderStroke(1.dp, AppColors.BorderSubtle), RoundedCornerShape(16.dp)),
+            .border(BorderStroke(1.dp, AppColors.BorderSubtle), RoundedCornerShape(16.dp))
+            .clickable(enabled = photoBitmap != null) { showFullPhoto = true },
         contentAlignment = Alignment.Center
     ) {
         if (photoBitmap != null) {
@@ -335,9 +403,10 @@ private fun ViewProductDetailContent(
                 bitmap = photoBitmap,
                 contentDescription = "Foto do produto ${product.name}",
                 contentScale = ContentScale.Fit,
+                filterQuality = FilterQuality.High,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
+                    .height(220.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .testTag("product_detail_photo")
             )
@@ -530,9 +599,9 @@ private fun ViewProductDetailContent(
                     .height(48.dp)
                     .testTag("btn_delete_product")
             ) {
-                Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Delete, contentDescription = null, tint = AppColors.StatusDivergenceText, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Excluir", fontWeight = FontWeight.Bold)
+                Text("Excluir", color = AppColors.StatusDivergenceText, fontWeight = FontWeight.Bold)
             }
 
             Button(
@@ -544,9 +613,9 @@ private fun ViewProductDetailContent(
                     .height(48.dp)
                     .testTag("btn_edit_product")
             ) {
-                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Edit, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Editar", fontWeight = FontWeight.Bold)
+                Text("Editar", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
     } else {
@@ -625,6 +694,7 @@ private fun EditProductFormContent(
                     bitmap = photoBitmap,
                     contentDescription = "Foto em edição",
                     contentScale = ContentScale.Fit,
+                    filterQuality = FilterQuality.High,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(180.dp)
@@ -658,27 +728,31 @@ private fun EditProductFormContent(
             OutlinedButton(
                 onClick = onLaunchCamera,
                 shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, AppColors.Primary),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.Primary),
                 modifier = Modifier
                     .weight(1f)
                     .height(44.dp)
                     .testTag("btn_edit_take_photo")
             ) {
-                Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.CameraAlt, contentDescription = null, tint = AppColors.Primary, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Câmera", style = MaterialTheme.typography.labelMedium)
+                Text("Câmera", color = AppColors.Primary, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
             }
 
             OutlinedButton(
                 onClick = onLaunchGallery,
                 shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, AppColors.Primary),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.Primary),
                 modifier = Modifier
                     .weight(1f)
                     .height(44.dp)
                     .testTag("btn_edit_gallery_photo")
             ) {
-                Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = AppColors.Primary, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Galeria", style = MaterialTheme.typography.labelMedium)
+                Text("Galeria", color = AppColors.Primary, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
             }
 
             if (uiState.editPhotoBase64.isNotBlank()) {
@@ -819,12 +893,14 @@ private fun EditProductFormContent(
                 onClick = onCancelEditing,
                 enabled = !uiState.isSavingOrDeleting,
                 shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, AppColors.BorderStrong),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.TextPrimary),
                 modifier = Modifier
                     .weight(1f)
                     .height(48.dp)
                     .testTag("btn_cancel_edit_product")
             ) {
-                Text("Cancelar")
+                Text("Cancelar", color = AppColors.TextPrimary, fontWeight = FontWeight.SemiBold)
             }
 
             Button(
@@ -840,9 +916,9 @@ private fun EditProductFormContent(
                 if (uiState.isSavingOrDeleting) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White)
                 } else {
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Salvar Alterações", fontWeight = FontWeight.Bold)
+                    Text("Salvar Alterações", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }

@@ -66,28 +66,28 @@ object AppColors {
 
     // Cores Institucionais
     val Primary: Color
-        get() = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7)
+        get() = if (isDark) Color(0xFF38BDF8) else Color(0xFF0369A1)
 
     val PrimaryHover: Color
-        get() = if (isDark) Color(0xFF0284C7) else Color(0xFF0369A1)
+        get() = if (isDark) Color(0xFF0284C7) else Color(0xFF075985)
 
     val PrimaryLight: Color
-        get() = if (isDark) Color(0xFF7DD3FC) else Color(0xFF0284C7)
+        get() = if (isDark) Color(0xFF7DD3FC) else Color(0xFF0369A1)
 
     val PrimaryContainer: Color
         get() = if (isDark) Color(0xFF0284C7).copy(alpha = 0.30f) else Color(0xFFE0F2FE)
 
     val OnPrimaryContainer: Color
-        get() = if (isDark) Color(0xFFE0F2FE) else Color(0xFF0369A1)
+        get() = if (isDark) Color(0xFFE0F2FE) else Color(0xFF0C4A6E)
 
     val Secondary: Color
-        get() = if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488)
+        get() = if (isDark) Color(0xFF2DD4BF) else Color(0xFF0F766E)
 
     val SecondaryContainer: Color
         get() = if (isDark) Color(0xFF0F766E).copy(alpha = 0.35f) else Color(0xFFCCFBF1)
 
     val OnSecondaryContainer: Color
-        get() = if (isDark) Color(0xFFCCFBF1) else Color(0xFF115E59)
+        get() = if (isDark) Color(0xFFCCFBF1) else Color(0xFF134E4A)
 
     // Superfícies Neutras
     val Background: Color
@@ -109,20 +109,20 @@ object AppColors {
         get() = if (isDark) Color(0x33FFFFFF) else Color(0xFFCBD5E1)
 
     val BorderStrong: Color
-        get() = if (isDark) Color(0x59FFFFFF) else Color(0xFF94A3B8)
+        get() = if (isDark) Color(0x59FFFFFF) else Color(0xFF64748B)
 
     // Tipografia Neutra
     val TextPrimary: Color
         get() = if (isDark) Color(0xFFF8FAFC) else Color(0xFF000000)
 
     val TextSecondary: Color
-        get() = if (isDark) Color(0xFF94A3B8) else Color(0xFF111827)
+        get() = if (isDark) Color(0xFF94A3B8) else Color(0xFF000000)
 
     val TextTertiary: Color
-        get() = if (isDark) Color(0xFF64748B) else Color(0xFF1F2937)
+        get() = if (isDark) Color(0xFF64748B) else Color(0xFF111827)
 
     val TextDisabled: Color
-        get() = if (isDark) Color(0xFF475569) else Color(0xFF4B5563)
+        get() = if (isDark) Color(0xFF475569) else Color(0xFF374151)
 
     // Estados Semânticos de Baixa
     val StatusPending: Color

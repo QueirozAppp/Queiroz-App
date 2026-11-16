@@ -80,6 +80,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
@@ -125,9 +126,8 @@ fun RequestProductScreen(
     ) { uri: Uri? ->
         if (uri != null) {
             try {
-                val bitmap = ImageCompressionUtils.decodeScaledBitmapFromUri(context, uri)
-                if (bitmap != null) {
-                    val base64 = ImageCompressionUtils.resizeAndCompressBitmap(bitmap)
+                val base64 = ImageCompressionUtils.readImageToHighQualityBase64(context, uri)
+                if (!base64.isNullOrBlank()) {
                     viewModel.onPhotoCaptured(base64)
                 } else {
                     viewModel.setErrorMessage("Não foi possível processar a imagem da galeria.")
@@ -138,17 +138,34 @@ fun RequestProductScreen(
         }
     }
 
-    // Camera launcher to take a photo of the product
+    var pendingCameraPhotoUri by remember { mutableStateOf<Uri?>(null) }
+
+    // Camera launcher to take a full-resolution photo of the product
     val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicturePreview()
-    ) { bitmap: Bitmap? ->
-        if (bitmap != null) {
+        contract = ActivityResultContracts.TakePicture()
+    ) { success: Boolean ->
+        val uri = pendingCameraPhotoUri
+        if (success && uri != null) {
             try {
-                val base64 = ImageCompressionUtils.resizeAndCompressBitmap(bitmap)
-                viewModel.onPhotoCaptured(base64)
+                val base64 = ImageCompressionUtils.readImageToHighQualityBase64(context, uri)
+                if (!base64.isNullOrBlank()) {
+                    viewModel.onPhotoCaptured(base64)
+                } else {
+                    viewModel.setErrorMessage("Não foi possível processar foto da câmera.")
+                }
             } catch (e: Exception) {
                 viewModel.setErrorMessage("Erro ao processar foto da câmera: ${e.localizedMessage ?: e.message}")
             }
+        }
+    }
+
+    fun launchCameraDirectly() {
+        try {
+            val uri = ImageCompressionUtils.createCameraPhotoUri(context)
+            pendingCameraPhotoUri = uri
+            cameraLauncher.launch(uri)
+        } catch (e: Exception) {
+            viewModel.setErrorMessage("Não foi possível acionar a câmera em alta resolução: ${e.localizedMessage ?: e.message}")
         }
     }
 
@@ -157,11 +174,7 @@ fun RequestProductScreen(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            try {
-                cameraLauncher.launch(null)
-            } catch (e: Exception) {
-                viewModel.setErrorMessage("Não foi possível acionar a câmera. Tente utilizar a opção Galeria.")
-            }
+            launchCameraDirectly()
         } else {
             viewModel.setErrorMessage("Permissão da câmera necessária para tirar fotos. Você também pode escolher pela Galeria.")
         }
@@ -175,7 +188,7 @@ fun RequestProductScreen(
             ) == PackageManager.PERMISSION_GRANTED
 
             if (hasPermission) {
-                cameraLauncher.launch(null)
+                launchCameraDirectly()
             } else {
                 cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
             }
@@ -395,14 +408,7 @@ fun RequestProductScreen(
                     )
 
                     val capturedBitmap = remember(uiState.photoBase64) {
-                        if (uiState.photoBase64.isNotBlank()) {
-                            try {
-                                val bytes = Base64.decode(uiState.photoBase64, Base64.DEFAULT)
-                                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-                            } catch (_: Exception) {
-                                null
-                            }
-                        } else null
+                        ImageCompressionUtils.decodeBase64ToImageBitmap(uiState.photoBase64)
                     }
 
                     if (capturedBitmap != null) {
@@ -418,7 +424,8 @@ fun RequestProductScreen(
                                     bitmap = capturedBitmap,
                                     contentDescription = "Foto capturada do produto",
                                     modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
+                                    contentScale = ContentScale.Fit,
+                                    filterQuality = FilterQuality.High
                                 )
                                 Row(
                                     modifier = Modifier
@@ -515,10 +522,11 @@ fun RequestProductScreen(
                                         Icon(
                                             imageVector = Icons.Default.CameraAlt,
                                             contentDescription = null,
+                                            tint = Color.White,
                                             modifier = Modifier.size(18.dp)
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Tirar Foto", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                                        Text("Tirar Foto", color = Color.White, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                                     }
 
                                     OutlinedButton(
@@ -542,10 +550,11 @@ fun RequestProductScreen(
                                         Icon(
                                             imageVector = Icons.Default.PhotoLibrary,
                                             contentDescription = null,
+                                            tint = AppColors.Primary,
                                             modifier = Modifier.size(18.dp)
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Galeria", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                                        Text("Galeria", color = AppColors.Primary, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -674,10 +683,11 @@ fun RequestProductScreen(
                         if (uiState.isLoading) {
                             CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
                         } else {
-                            Icon(Icons.Default.Inventory2, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Inventory2, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = if (isDirectPublisher) "Cadastrar Produto no Catálogo" else "Solicitar Cadastro de Produto",
+                                color = Color.White,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -722,14 +732,7 @@ private fun MyRequestItemCard(request: ProductRegistrationRequest) {
     val dateStr = if (request.requestedAt > 0) dateFormat.format(Date(request.requestedAt)) else ""
 
     val photoBitmap = remember(request.photoBase64) {
-        if (request.photoBase64.isNotBlank()) {
-            try {
-                val bytes = Base64.decode(request.photoBase64, Base64.DEFAULT)
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-            } catch (_: Exception) {
-                null
-            }
-        } else null
+        ImageCompressionUtils.decodeBase64ToImageBitmap(request.photoBase64)
     }
 
     Card(
@@ -756,7 +759,8 @@ private fun MyRequestItemCard(request: ProductRegistrationRequest) {
                             modifier = Modifier
                                 .size(50.dp)
                                 .clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Crop
+                            contentScale = ContentScale.Crop,
+                            filterQuality = FilterQuality.High
                         )
                     } else {
                         Box(

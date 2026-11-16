@@ -360,7 +360,10 @@ class MainActivity : ComponentActivity() {
                                     updateUiState = updateUiState,
                                     onCheckForUpdate = { appUpdateViewModel.checkManually() },
                                     onUpdateNow = { appUpdateViewModel.onUpdateNow(this@MainActivity) },
-                                    onDismissUpdateBanner = { appUpdateViewModel.dismissBannerForLater() }
+                                    onDismissUpdateBanner = { appUpdateViewModel.dismissBannerForLater() },
+                                    onPublishCloudUpdate = { ver, bld, notes, url ->
+                                        appUpdateViewModel.publishCloudUpdate(ver, bld, notes, url)
+                                    }
                                 )
                             }
                         }

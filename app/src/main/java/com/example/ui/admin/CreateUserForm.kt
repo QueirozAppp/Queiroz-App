@@ -233,9 +233,9 @@ fun CreateUserForm(
                             onClick = { showAddStoreDialog = true },
                             modifier = Modifier.testTag("btn_add_new_store")
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Add, contentDescription = null, tint = AppColors.Primary, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("+ Nova Loja", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            Text("+ Nova Loja", style = MaterialTheme.typography.labelSmall, color = AppColors.Primary, fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -287,6 +287,7 @@ fun CreateUserForm(
                             storeDialogError = null
                         }
                     },
+                    containerColor = AppColors.Surface,
                     title = { Text("Cadastrar Nova Loja", fontWeight = FontWeight.Bold, color = AppColors.TextPrimary) },
                     text = {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -382,7 +383,7 @@ fun CreateUserForm(
                             if (isSavingStore) {
                                 CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White)
                             } else {
-                                Text("Salvar Loja", fontWeight = FontWeight.Bold)
+                                Text("Salvar Loja", color = Color.White, fontWeight = FontWeight.Bold)
                             }
                         }
                     },
@@ -394,9 +395,10 @@ fun CreateUserForm(
                                 storeDialogError = null
                             },
                             shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, AppColors.BorderStrong),
                             modifier = Modifier.testTag("btn_cancel_store_dialog")
                         ) {
-                            Text("Cancelar")
+                            Text("Cancelar", color = AppColors.TextPrimary)
                         }
                     }
                 )
@@ -450,12 +452,12 @@ fun CreateUserForm(
                     onClick = viewModel::cancelCreatingUser,
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(1.dp, AppColors.BorderStrong),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.TextSecondary),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.TextPrimary),
                     modifier = Modifier
                         .weight(1f)
                         .height(48.dp)
                 ) {
-                    Text("Cancelar")
+                    Text("Cancelar", color = AppColors.TextPrimary, fontWeight = FontWeight.SemiBold)
                 }
 
                 Button(
@@ -471,7 +473,7 @@ fun CreateUserForm(
                     if (uiState.isLoading) {
                         CircularProgressIndicator(modifier = Modifier.size(22.dp), color = Color.White)
                     } else {
-                        Text("Salvar Usuário", fontWeight = FontWeight.Bold)
+                        Text("Salvar Usuário", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }

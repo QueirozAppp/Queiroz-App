@@ -164,6 +164,7 @@ fun AdminSectorsScreen(
         if (uiState.showCreateDialog) {
             AlertDialog(
                 onDismissRequest = viewModel::closeDialog,
+                containerColor = AppColors.Surface,
                 title = {
                     Text(
                         text = if (uiState.editingSector != null) "Editar Setor" else "Novo Setor",
@@ -202,15 +203,16 @@ fun AdminSectorsScreen(
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary)
                     ) {
-                        Text("Salvar", fontWeight = FontWeight.Bold)
+                        Text("Salvar", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 },
                 dismissButton = {
                     OutlinedButton(
                         onClick = viewModel::closeDialog,
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, AppColors.BorderStrong)
                     ) {
-                        Text("Cancelar")
+                        Text("Cancelar", color = AppColors.TextPrimary)
                     }
                 }
             )

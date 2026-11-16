@@ -172,6 +172,7 @@ fun AdminUsersScreen(
 
                 AlertDialog(
                     onDismissRequest = { userToEdit = null },
+                    containerColor = AppColors.Surface,
                     title = {
                         Text(
                             text = "Editar Dados do Usuário",
@@ -273,7 +274,7 @@ fun AdminUsersScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
                             modifier = Modifier.testTag("btn_confirm_edit_user")
                         ) {
-                            Text("Salvar Alterações", fontWeight = FontWeight.Bold)
+                            Text("Salvar Alterações", color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     },
                     dismissButton = {
@@ -281,7 +282,7 @@ fun AdminUsersScreen(
                             onClick = { userToEdit = null },
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Cancelar")
+                            Text("Cancelar", color = AppColors.TextPrimary)
                         }
                     }
                 )
@@ -291,8 +292,9 @@ fun AdminUsersScreen(
             showDeleteConfirmation?.let { userToDelete ->
                 AlertDialog(
                     onDismissRequest = { showDeleteConfirmation = null },
-                    title = { Text("Excluir Usuário") },
-                    text = { Text("Tem certeza que deseja excluir permanentemente o usuário ${userToDelete.name}? Esta ação não pode ser desfeita.") },
+                    containerColor = AppColors.Surface,
+                    title = { Text("Excluir Usuário", color = AppColors.TextPrimary, fontWeight = FontWeight.Bold) },
+                    text = { Text("Tem certeza que deseja excluir permanentemente o usuário ${userToDelete.name}? Esta ação não pode ser desfeita.", color = AppColors.TextSecondary) },
                     confirmButton = {
                         TextButton(
                             onClick = {
@@ -301,12 +303,12 @@ fun AdminUsersScreen(
                             },
                             colors = ButtonDefaults.textButtonColors(contentColor = AppColors.StatusDivergence)
                         ) {
-                            Text("Excluir")
+                            Text("Excluir", color = AppColors.StatusDivergence, fontWeight = FontWeight.Bold)
                         }
                     },
                     dismissButton = {
                         TextButton(onClick = { showDeleteConfirmation = null }) {
-                            Text("Cancelar")
+                            Text("Cancelar", color = AppColors.TextPrimary)
                         }
                     }
                 )

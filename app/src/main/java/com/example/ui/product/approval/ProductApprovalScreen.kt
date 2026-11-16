@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -63,16 +64,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.core.model.ProductRegistrationRequest
 import com.example.core.model.ProductRequestStatus
 import com.example.core.model.UserProfile
+import com.example.core.util.ImageCompressionUtils
 import com.example.ui.components.AppColors
 import com.example.ui.components.AppEmptyState
 import com.example.ui.components.AppSectionHeader
@@ -99,46 +104,74 @@ fun ProductApprovalScreen(
         onBackToHome()
     }
 
-    // Photo Zoom Dialog
+    // Photo Zoom Dialog (Full-width High Quality)
     zoomedPhotoBase64?.let { base64 ->
         val bitmap = remember(base64) {
-            try {
-                val bytes = Base64.decode(base64, Base64.DEFAULT)
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-            } catch (_: Exception) {
-                null
-            }
+            ImageCompressionUtils.decodeBase64ToImageBitmap(base64)
         }
 
-        AlertDialog(
+        Dialog(
             onDismissRequest = { zoomedPhotoBase64 = null },
-            confirmButton = {
-                TextButton(onClick = { zoomedPhotoBase64 = null }) {
-                    Text("Fechar")
-                }
-            },
-            text = {
-                if (bitmap != null) {
-                    Image(
-                        bitmap = bitmap,
-                        contentDescription = "Foto ampliada do produto",
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = AppColors.Surface,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 24.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Foto do Produto (Qualidade Original)",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = AppColors.TextPrimary
+                    )
+                    if (bitmap != null) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(AppColors.SurfaceVariant.copy(alpha = 0.25f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                bitmap = bitmap,
+                                contentDescription = "Foto ampliada do produto",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 240.dp, max = 520.dp)
+                                    .clip(RoundedCornerShape(14.dp)),
+                                contentScale = ContentScale.Fit,
+                                filterQuality = FilterQuality.High
+                            )
+                        }
+                    } else {
+                        Text("Foto indisponível", color = AppColors.TextPrimary)
+                    }
+                    Button(
+                        onClick = { zoomedPhotoBase64 = null },
+                        colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(350.dp)
-                            .clip(RoundedCornerShape(12.dp)),
-                        contentScale = ContentScale.Fit
-                    )
-                } else {
-                    Text("Foto indisponível")
+                            .height(48.dp)
+                    ) {
+                        Text("Fechar", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
-        )
+        }
     }
 
     // Approve Dialog (Review & Confirm)
     uiState.approvingRequest?.let { req ->
         AlertDialog(
             onDismissRequest = viewModel::closeApproveDialog,
+            containerColor = AppColors.Surface,
             title = {
                 Text(
                     text = "Aprovar Cadastro de Produto",
@@ -213,16 +246,17 @@ fun ProductApprovalScreen(
                     if (uiState.isLoading) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White)
                     } else {
-                        Text("Confirmar Aprovação", fontWeight = FontWeight.Bold)
+                        Text("Confirmar Aprovação", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             },
             dismissButton = {
                 OutlinedButton(
                     onClick = viewModel::closeApproveDialog,
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, AppColors.BorderStrong)
                 ) {
-                    Text("Cancelar")
+                    Text("Cancelar", color = AppColors.TextPrimary)
                 }
             }
         )
@@ -232,6 +266,7 @@ fun ProductApprovalScreen(
     uiState.rejectingRequest?.let { req ->
         AlertDialog(
             onDismissRequest = viewModel::closeRejectDialog,
+            containerColor = AppColors.Surface,
             title = {
                 Text(
                     text = "Recusar Cadastro de Produto",
@@ -274,16 +309,17 @@ fun ProductApprovalScreen(
                     if (uiState.isLoading) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White)
                     } else {
-                        Text("Recusar Cadastro", fontWeight = FontWeight.Bold)
+                        Text("Recusar Cadastro", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             },
             dismissButton = {
                 OutlinedButton(
                     onClick = viewModel::closeRejectDialog,
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, AppColors.BorderStrong)
                 ) {
-                    Text("Cancelar")
+                    Text("Cancelar", color = AppColors.TextPrimary)
                 }
             }
         )
@@ -391,12 +427,18 @@ fun ProductApprovalScreen(
                     FilterChip(
                         selected = isSelected,
                         onClick = { viewModel.onFilterStatusChanged("PENDING") },
-                        label = { Text("Pendentes (${uiState.pendingCount})") },
+                        label = {
+                            Text(
+                                text = "Pendentes (${uiState.pendingCount})",
+                                color = if (isSelected) AppColors.Primary else AppColors.TextPrimary,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AppColors.PrimaryContainer,
                             selectedLabelColor = AppColors.Primary,
                             containerColor = AppColors.Surface,
-                            labelColor = AppColors.TextSecondary
+                            labelColor = AppColors.TextPrimary
                         ),
                         border = FilterChipDefaults.filterChipBorder(
                             enabled = true,
@@ -410,12 +452,18 @@ fun ProductApprovalScreen(
                     FilterChip(
                         selected = isSelected,
                         onClick = { viewModel.onFilterStatusChanged("APPROVED") },
-                        label = { Text("Aprovados") },
+                        label = {
+                            Text(
+                                text = "Aprovados",
+                                color = if (isSelected) AppColors.StatusCompletedText else AppColors.TextPrimary,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AppColors.StatusCompletedBg,
                             selectedLabelColor = AppColors.StatusCompletedText,
                             containerColor = AppColors.Surface,
-                            labelColor = AppColors.TextSecondary
+                            labelColor = AppColors.TextPrimary
                         ),
                         border = FilterChipDefaults.filterChipBorder(
                             enabled = true,
@@ -429,12 +477,18 @@ fun ProductApprovalScreen(
                     FilterChip(
                         selected = isSelected,
                         onClick = { viewModel.onFilterStatusChanged("REJECTED") },
-                        label = { Text("Recusados") },
+                        label = {
+                            Text(
+                                text = "Recusados",
+                                color = if (isSelected) AppColors.StatusDivergenceText else AppColors.TextPrimary,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AppColors.StatusDivergenceBg,
                             selectedLabelColor = AppColors.StatusDivergenceText,
                             containerColor = AppColors.Surface,
-                            labelColor = AppColors.TextSecondary
+                            labelColor = AppColors.TextPrimary
                         ),
                         border = FilterChipDefaults.filterChipBorder(
                             enabled = true,
@@ -448,12 +502,18 @@ fun ProductApprovalScreen(
                     FilterChip(
                         selected = isSelected,
                         onClick = { viewModel.onFilterStatusChanged("ALL") },
-                        label = { Text("Todos") },
+                        label = {
+                            Text(
+                                text = "Todos",
+                                color = if (isSelected) AppColors.Primary else AppColors.TextPrimary,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AppColors.PrimaryContainer,
                             selectedLabelColor = AppColors.Primary,
                             containerColor = AppColors.Surface,
-                            labelColor = AppColors.TextSecondary
+                            labelColor = AppColors.TextPrimary
                         ),
                         border = FilterChipDefaults.filterChipBorder(
                             enabled = true,
@@ -508,14 +568,7 @@ private fun ApprovalItemCard(
     val dateStr = if (request.requestedAt > 0) dateFormat.format(Date(request.requestedAt)) else ""
 
     val photoBitmap = remember(request.photoBase64) {
-        if (request.photoBase64.isNotBlank()) {
-            try {
-                val bytes = Base64.decode(request.photoBase64, Base64.DEFAULT)
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-            } catch (_: Exception) {
-                null
-            }
-        } else null
+        ImageCompressionUtils.decodeBase64ToImageBitmap(request.photoBase64)
     }
 
     Card(
@@ -545,7 +598,8 @@ private fun ApprovalItemCard(
                             bitmap = photoBitmap,
                             contentDescription = "Foto do produto",
                             modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
+                            contentScale = ContentScale.Crop,
+                            filterQuality = FilterQuality.High
                         )
                         Box(
                             modifier = Modifier
@@ -707,15 +761,27 @@ private fun ApprovalItemCard(
                         onClick = onReject,
                         shape = RoundedCornerShape(10.dp),
                         border = BorderStroke(1.dp, AppColors.StatusDivergence),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.StatusDivergence),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color.Transparent,
+                            contentColor = AppColors.StatusDivergence
+                        ),
                         modifier = Modifier
                             .weight(1f)
                             .height(44.dp)
                             .testTag("btn_reject_${request.id}")
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = null,
+                            tint = AppColors.StatusDivergence,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Recusar", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "Recusar",
+                            color = AppColors.StatusDivergence,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
                     Button(
@@ -727,9 +793,18 @@ private fun ApprovalItemCard(
                             .height(44.dp)
                             .testTag("btn_approve_${request.id}")
                     ) {
-                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Aprovar", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "Aprovar",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }

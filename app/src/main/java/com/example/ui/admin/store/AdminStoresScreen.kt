@@ -83,8 +83,9 @@ fun AdminStoresScreen(
     showDeleteConfirmation?.let { storeToDelete ->
         AlertDialog(
             onDismissRequest = { showDeleteConfirmation = null },
-            title = { Text("Excluir Loja") },
-            text = { Text("Tem certeza que deseja excluir a loja ${storeToDelete.name}? Todos os setores vinculados também serão removidos.") },
+            containerColor = AppColors.Surface,
+            title = { Text("Excluir Loja", color = AppColors.TextPrimary, fontWeight = FontWeight.Bold) },
+            text = { Text("Tem certeza que deseja excluir a loja ${storeToDelete.name}? Todos os setores vinculados também serão removidos.", color = AppColors.TextSecondary) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -93,12 +94,12 @@ fun AdminStoresScreen(
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = AppColors.StatusDivergence)
                 ) {
-                    Text("Excluir")
+                    Text("Excluir", color = AppColors.StatusDivergence, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirmation = null }) {
-                    Text("Cancelar")
+                    Text("Cancelar", color = AppColors.TextPrimary)
                 }
             }
         )
@@ -194,6 +195,7 @@ fun AdminStoresScreen(
         if (uiState.showCreateDialog) {
             AlertDialog(
                 onDismissRequest = viewModel::closeDialog,
+                containerColor = AppColors.Surface,
                 title = {
                     Text(
                         text = if (uiState.editingStore != null) "Editar Loja" else "Nova Loja",
@@ -232,15 +234,16 @@ fun AdminStoresScreen(
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary)
                     ) {
-                        Text("Salvar", fontWeight = FontWeight.Bold)
+                        Text("Salvar", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 },
                 dismissButton = {
                     OutlinedButton(
                         onClick = viewModel::closeDialog,
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, AppColors.BorderStrong)
                     ) {
-                        Text("Cancelar")
+                        Text("Cancelar", color = AppColors.TextPrimary)
                     }
                 }
             )
@@ -367,9 +370,9 @@ private fun StoreItemCard(
                     colors = ButtonDefaults.buttonColors(containerColor = AppColors.Secondary),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Icon(Icons.Default.GridView, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.GridView, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Setores", maxLines = 1, softWrap = false, fontWeight = FontWeight.Bold)
+                    Text("Setores", maxLines = 1, softWrap = false, color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }

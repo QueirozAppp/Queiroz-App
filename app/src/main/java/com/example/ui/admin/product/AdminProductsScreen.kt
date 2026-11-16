@@ -79,6 +79,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -430,6 +431,7 @@ private fun ProductItemCard(
                             bitmap = photoBitmap,
                             contentDescription = "Foto do produto ${product.name}",
                             contentScale = ContentScale.Crop,
+                            filterQuality = FilterQuality.High,
                             modifier = Modifier
                                 .size(56.dp)
                                 .clip(RoundedCornerShape(12.dp))
@@ -557,14 +559,7 @@ private fun CreateProductForm(
     val selectedUnitLabel = uiState.availableUnits.find { it.name == uiState.newUnit }?.label ?: uiState.newUnit
 
     val photoBitmap = remember(uiState.newPhotoBase64) {
-        if (uiState.newPhotoBase64.isNotBlank()) {
-            try {
-                val bytes = Base64.decode(uiState.newPhotoBase64, Base64.DEFAULT)
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-            } catch (_: Exception) {
-                null
-            }
-        } else null
+        ImageCompressionUtils.decodeBase64ToImageBitmap(uiState.newPhotoBase64)
     }
 
     // Launchers de Câmera e Galeria para novo produto
@@ -573,9 +568,8 @@ private fun CreateProductForm(
     ) { uri: Uri? ->
         if (uri != null) {
             try {
-                val bitmap = ImageCompressionUtils.decodeScaledBitmapFromUri(context, uri)
-                if (bitmap != null) {
-                    val base64 = ImageCompressionUtils.resizeAndCompressBitmap(bitmap)
+                val base64 = ImageCompressionUtils.readImageToHighQualityBase64(context, uri)
+                if (!base64.isNullOrBlank()) {
                     viewModel.onNewPhotoCaptured(base64)
                 } else {
                     Toast.makeText(context, "Erro ao decodificar imagem.", Toast.LENGTH_SHORT).show()
@@ -586,16 +580,33 @@ private fun CreateProductForm(
         }
     }
 
+    var pendingCameraPhotoUri by remember { mutableStateOf<Uri?>(null) }
+
     val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicturePreview()
-    ) { bitmap: Bitmap? ->
-        if (bitmap != null) {
+        contract = ActivityResultContracts.TakePicture()
+    ) { success: Boolean ->
+        val uri = pendingCameraPhotoUri
+        if (success && uri != null) {
             try {
-                val base64 = resizeAndCompressBitmap(bitmap)
-                viewModel.onNewPhotoCaptured(base64)
+                val base64 = ImageCompressionUtils.readImageToHighQualityBase64(context, uri)
+                if (!base64.isNullOrBlank()) {
+                    viewModel.onNewPhotoCaptured(base64)
+                } else {
+                    Toast.makeText(context, "Erro ao processar foto.", Toast.LENGTH_SHORT).show()
+                }
             } catch (e: Exception) {
                 Toast.makeText(context, "Erro ao processar foto: ${e.message}", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    fun launchCameraDirectly() {
+        try {
+            val uri = ImageCompressionUtils.createCameraPhotoUri(context)
+            pendingCameraPhotoUri = uri
+            cameraLauncher.launch(uri)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Falha ao acionar câmera em alta resolução: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -603,7 +614,7 @@ private fun CreateProductForm(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            cameraLauncher.launch(null)
+            launchCameraDirectly()
         } else {
             Toast.makeText(context, "Permissão da câmera necessária.", Toast.LENGTH_SHORT).show()
         }
@@ -615,7 +626,7 @@ private fun CreateProductForm(
             Manifest.permission.CAMERA
         ) == PackageManager.PERMISSION_GRANTED
         if (hasPermission) {
-            cameraLauncher.launch(null)
+            launchCameraDirectly()
         } else {
             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
@@ -662,6 +673,7 @@ private fun CreateProductForm(
                             bitmap = photoBitmap,
                             contentDescription = "Foto capturada",
                             contentScale = ContentScale.Crop,
+                            filterQuality = FilterQuality.High,
                             modifier = Modifier.fillMaxSize()
                         )
                     }
@@ -689,14 +701,16 @@ private fun CreateProductForm(
                     OutlinedButton(
                         onClick = { launchCamera() },
                         shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, AppColors.Primary),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.Primary),
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp)
                             .testTag("btn_new_product_camera")
                     ) {
-                        Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.CameraAlt, contentDescription = null, tint = AppColors.Primary, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Câmera", style = MaterialTheme.typography.labelSmall)
+                        Text("Câmera", color = AppColors.Primary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                     }
 
                     OutlinedButton(
@@ -706,14 +720,16 @@ private fun CreateProductForm(
                             )
                         },
                         shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, AppColors.Primary),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.Primary),
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp)
                             .testTag("btn_new_product_gallery")
                     ) {
-                        Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = AppColors.Primary, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Galeria", style = MaterialTheme.typography.labelSmall)
+                        Text("Galeria", color = AppColors.Primary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                     }
 
                     if (uiState.newPhotoBase64.isNotBlank()) {
@@ -837,13 +853,13 @@ private fun CreateProductForm(
                     onClick = viewModel::cancelCreatingProduct,
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(1.dp, AppColors.BorderStrong),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.TextSecondary),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.TextPrimary),
                     modifier = Modifier
                         .weight(1f)
                         .height(48.dp)
                         .testTag("btn_cancel_create_product")
                 ) {
-                    Text("Cancelar")
+                    Text("Cancelar", color = AppColors.TextPrimary, fontWeight = FontWeight.SemiBold)
                 }
 
                 Button(
@@ -859,7 +875,7 @@ private fun CreateProductForm(
                     if (uiState.isLoading) {
                         CircularProgressIndicator(modifier = Modifier.size(22.dp), color = Color.White)
                     } else {
-                        Text("Salvar no Catálogo", fontWeight = FontWeight.Bold)
+                        Text("Salvar no Catálogo", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }

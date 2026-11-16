@@ -108,6 +108,7 @@ fun HomeAuthenticatedScreen(
     onCheckForUpdate: (() -> Unit)? = null,
     onUpdateNow: (() -> Unit)? = null,
     onDismissUpdateBanner: (() -> Unit)? = null,
+    onPublishCloudUpdate: ((version: String, build: Int, notes: String, url: String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -665,7 +666,12 @@ fun HomeAuthenticatedScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Person, contentDescription = null, tint = AppColors.Primary, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = "Detalhes da Sessão", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "Detalhes da Sessão",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = AppColors.TextPrimary
+                            )
                         }
                         ProfileInfoRow(label = "E-mail:", value = userProfile.email)
                         ProfileInfoRow(label = "Status da Conta:", value = if (userProfile.active) "Ativo" else "Inativo")
@@ -679,7 +685,9 @@ fun HomeAuthenticatedScreen(
                         isChecking = updateUiState.isChecking,
                         statusMessage = updateUiState.statusMessage,
                         isStatusError = updateUiState.isStatusError,
-                        onCheckForUpdateClick = onCheckForUpdate
+                        onCheckForUpdateClick = onCheckForUpdate,
+                        isAdmin = userProfile.role == UserRole.ADMIN,
+                        onPublishCloudUpdate = onPublishCloudUpdate
                     )
                 }
             }

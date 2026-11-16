@@ -12,12 +12,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.WifiOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -26,15 +29,21 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.core.update.AppUpdateConfig
 import com.example.core.update.RemoteVersionInfo
@@ -139,8 +148,94 @@ fun CheckUpdateSectionCard(
     statusMessage: String?,
     isStatusError: Boolean,
     onCheckForUpdateClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isAdmin: Boolean = false,
+    onPublishCloudUpdate: ((version: String, build: Int, notes: String, url: String) -> Unit)? = null
 ) {
+    var showPublishDialog by remember { mutableStateOf(false) }
+    var versionInput by remember { mutableStateOf(AppUpdateConfig.APP_VERSION) }
+    var buildInput by remember { mutableStateOf((AppUpdateConfig.APP_BUILD + 1).toString()) }
+    var notesInput by remember { mutableStateOf("Nova versão disponível para download.") }
+    var urlInput by remember { mutableStateOf(AppUpdateConfig.FALLBACK_DOWNLOAD_URL) }
+
+    if (showPublishDialog && onPublishCloudUpdate != null) {
+        AlertDialog(
+            onDismissRequest = { showPublishDialog = false },
+            containerColor = AppColors.Surface,
+            title = {
+                Text(
+                    text = "Publicar Atualização na Nuvem",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = AppColors.TextPrimary
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Notifica todos os usuários direto pelo Firestore (mesmo com GitHub privado).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AppColors.TextSecondary
+                    )
+                    OutlinedTextField(
+                        value = versionInput,
+                        onValueChange = { versionInput = it },
+                        label = { Text("Versão (ex: 1.3.0)") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = buildInput,
+                        onValueChange = { buildInput = it.filter { ch -> ch.isDigit() } },
+                        label = { Text("Número do Build (atual: ${AppUpdateConfig.APP_BUILD})") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = notesInput,
+                        onValueChange = { notesInput = it },
+                        label = { Text("Notas da Versão") },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = urlInput,
+                        onValueChange = { urlInput = it },
+                        label = { Text("Link do APK / Release") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val parsedBuild = buildInput.toIntOrNull() ?: 0
+                        onPublishCloudUpdate(versionInput, parsedBuild, notesInput, urlInput)
+                        showPublishDialog = false
+                    },
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary)
+                ) {
+                    Text("Publicar", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showPublishDialog = false },
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, AppColors.BorderStrong)
+                ) {
+                    Text("Cancelar", color = AppColors.TextPrimary)
+                }
+            }
+        )
+    }
+
     Card(
         colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
         shape = RoundedCornerShape(16.dp),
@@ -233,6 +328,29 @@ fun CheckUpdateSectionCard(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Verificar atualização", fontWeight = FontWeight.Bold, color = AppColors.Primary)
+                }
+            }
+
+            if (isAdmin && onPublishCloudUpdate != null) {
+                TextButton(
+                    onClick = { showPublishDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .testTag("btn_admin_publish_update")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CloudUpload,
+                        contentDescription = null,
+                        tint = AppColors.TextPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Admin: Publicar nova versão na nuvem",
+                        color = AppColors.TextPrimary,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }

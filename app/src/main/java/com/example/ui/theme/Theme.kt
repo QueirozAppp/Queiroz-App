@@ -40,12 +40,12 @@ private val LightColorScheme = lightColorScheme(
     secondaryContainer = Color(0xFFCCFBF1),
     onSecondaryContainer = Color(0xFF115E59),
     background = Color(0xFFF1F5F9),
-    onBackground = Color(0xFF0F172A),
+    onBackground = Color(0xFF000000),
     surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF0F172A),
+    onSurface = Color(0xFF000000),
     surfaceVariant = Color(0xFFE2E8F0),
-    onSurfaceVariant = Color(0xFF475569),
-    outline = Color(0xFFCBD5E1),
+    onSurfaceVariant = Color(0xFF000000),
+    outline = Color(0xFF94A3B8),
     error = Color(0xFFDC2626),
     onError = Color.White,
     errorContainer = Color(0xFFFEE2E2),
@@ -58,18 +58,19 @@ fun MyApplicationTheme(
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    // Keep AppColors tokens synchronized with active theme safely outside composition
-    SideEffect {
-        if (AppColors.isDark != darkTheme) {
-            AppColors.isDark = darkTheme
-        }
-    }
+    // Keep AppColors tokens synchronized synchronously during composition
+    AppColors.isDark = darkTheme
 
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+        typography = Typography
+    ) {
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.material3.LocalContentColor provides (if (darkTheme) Color(0xFFF8FAFC) else Color(0xFF000000))
+        ) {
+            content()
+        }
+    }
 }

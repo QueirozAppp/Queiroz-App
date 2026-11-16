@@ -158,54 +158,102 @@ fun ReportsScreen(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 item {
+                    val isSelected = uiState.selectedPeriod == "TODAY"
                     FilterChip(
-                        selected = uiState.selectedPeriod == "TODAY",
+                        selected = isSelected,
                         onClick = { viewModel.setPeriodFilter("TODAY") },
-                        label = { Text("Hoje") },
+                        label = {
+                            Text(
+                                text = "Hoje",
+                                color = if (isSelected) AppColors.Primary else AppColors.TextPrimary,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AppColors.PrimaryContainer,
                             selectedLabelColor = AppColors.Primary,
                             containerColor = AppColors.Surface,
-                            labelColor = AppColors.TextSecondary
+                            labelColor = AppColors.TextPrimary
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = if (isSelected) AppColors.Primary else AppColors.BorderSubtle
                         )
                     )
                 }
                 item {
+                    val isSelected = uiState.selectedPeriod == "7_DAYS"
                     FilterChip(
-                        selected = uiState.selectedPeriod == "7_DAYS",
+                        selected = isSelected,
                         onClick = { viewModel.setPeriodFilter("7_DAYS") },
-                        label = { Text("Últimos 7 dias") },
+                        label = {
+                            Text(
+                                text = "Últimos 7 dias",
+                                color = if (isSelected) AppColors.Primary else AppColors.TextPrimary,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AppColors.PrimaryContainer,
                             selectedLabelColor = AppColors.Primary,
                             containerColor = AppColors.Surface,
-                            labelColor = AppColors.TextSecondary
+                            labelColor = AppColors.TextPrimary
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = if (isSelected) AppColors.Primary else AppColors.BorderSubtle
                         )
                     )
                 }
                 item {
+                    val isSelected = uiState.selectedPeriod == "30_DAYS"
                     FilterChip(
-                        selected = uiState.selectedPeriod == "30_DAYS",
+                        selected = isSelected,
                         onClick = { viewModel.setPeriodFilter("30_DAYS") },
-                        label = { Text("Últimos 30 dias") },
+                        label = {
+                            Text(
+                                text = "Últimos 30 dias",
+                                color = if (isSelected) AppColors.Primary else AppColors.TextPrimary,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AppColors.PrimaryContainer,
                             selectedLabelColor = AppColors.Primary,
                             containerColor = AppColors.Surface,
-                            labelColor = AppColors.TextSecondary
+                            labelColor = AppColors.TextPrimary
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = if (isSelected) AppColors.Primary else AppColors.BorderSubtle
                         )
                     )
                 }
                 item {
+                    val isSelected = uiState.selectedPeriod == "ALL"
                     FilterChip(
-                        selected = uiState.selectedPeriod == "ALL",
+                        selected = isSelected,
                         onClick = { viewModel.setPeriodFilter("ALL") },
-                        label = { Text("Todo o histórico") },
+                        label = {
+                            Text(
+                                text = "Todo o histórico",
+                                color = if (isSelected) AppColors.Primary else AppColors.TextPrimary,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AppColors.PrimaryContainer,
                             selectedLabelColor = AppColors.Primary,
                             containerColor = AppColors.Surface,
-                            labelColor = AppColors.TextSecondary
+                            labelColor = AppColors.TextPrimary
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = if (isSelected) AppColors.Primary else AppColors.BorderSubtle
                         )
                     )
                 }
@@ -227,28 +275,52 @@ fun ReportsScreen(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     item {
+                        val isSelected = uiState.selectedStoreId == "ALL"
                         FilterChip(
-                            selected = uiState.selectedStoreId == "ALL",
+                            selected = isSelected,
                             onClick = { viewModel.setStoreFilter("ALL") },
-                            label = { Text("Todas as Lojas") },
+                            label = {
+                                Text(
+                                    text = "Todas as Lojas",
+                                    color = if (isSelected) AppColors.Primary else AppColors.TextPrimary,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = AppColors.PrimaryContainer,
                                 selectedLabelColor = AppColors.Primary,
                                 containerColor = AppColors.Surface,
-                                labelColor = AppColors.TextSecondary
+                                labelColor = AppColors.TextPrimary
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = isSelected,
+                                borderColor = if (isSelected) AppColors.Primary else AppColors.BorderSubtle
                             )
                         )
                     }
                     items(uiState.availableStores) { storeId ->
+                        val isSelected = uiState.selectedStoreId == storeId
                         FilterChip(
-                            selected = uiState.selectedStoreId == storeId,
+                            selected = isSelected,
                             onClick = { viewModel.setStoreFilter(storeId) },
-                            label = { Text(storeId) },
+                            label = {
+                                Text(
+                                    text = storeId,
+                                    color = if (isSelected) AppColors.Primary else AppColors.TextPrimary,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = AppColors.PrimaryContainer,
                                 selectedLabelColor = AppColors.Primary,
                                 containerColor = AppColors.Surface,
-                                labelColor = AppColors.TextSecondary
+                                labelColor = AppColors.TextPrimary
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = isSelected,
+                                borderColor = if (isSelected) AppColors.Primary else AppColors.BorderSubtle
                             )
                         )
                     }

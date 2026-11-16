@@ -102,7 +102,8 @@ fun NewRequestScreen(
     if (showExitConfirmation) {
         AlertDialog(
             onDismissRequest = { showExitConfirmation = false },
-            title = { Text("Descartar solicitação?", fontWeight = FontWeight.Bold) },
+            containerColor = AppColors.Surface,
+            title = { Text("Descartar solicitação?", fontWeight = FontWeight.Bold, color = AppColors.TextPrimary) },
             text = { Text("Você possui ${uiState.items.size} item(ns) na lista. Se sair agora, estes itens não enviados serão descartados.", color = AppColors.TextSecondary) },
             confirmButton = {
                 Button(
@@ -114,15 +115,16 @@ fun NewRequestScreen(
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = AppColors.StatusDivergence)
                 ) {
-                    Text("Descartar e Sair", fontWeight = FontWeight.Bold)
+                    Text("Descartar e Sair", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 OutlinedButton(
                     onClick = { showExitConfirmation = false },
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, AppColors.BorderStrong)
                 ) {
-                    Text("Continuar Editando")
+                    Text("Continuar Editando", color = AppColors.TextPrimary)
                 }
             }
         )
@@ -396,6 +398,7 @@ private fun QuantityDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = AppColors.Surface,
         title = {
             Text(
                 text = "Informar Quantidade",
@@ -449,15 +452,16 @@ private fun QuantityDialog(
                 colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
                 modifier = Modifier.testTag("btn_confirm_quantity")
             ) {
-                Text("Adicionar à Lista", fontWeight = FontWeight.Bold)
+                Text("Adicionar à Lista", color = Color.White, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             OutlinedButton(
                 onClick = onDismiss,
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(1.dp, AppColors.BorderStrong)
             ) {
-                Text("Cancelar")
+                Text("Cancelar", color = AppColors.TextPrimary)
             }
         }
     )
@@ -550,7 +554,7 @@ private fun ReviewSection(
                     .weight(1f)
                     .height(50.dp)
             ) {
-                Text("Voltar", style = MaterialTheme.typography.labelLarge)
+                Text("Voltar", style = MaterialTheme.typography.labelLarge, color = AppColors.TextPrimary)
             }
 
             Button(
@@ -566,7 +570,7 @@ private fun ReviewSection(
                 if (isLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White)
                 } else {
-                    Text("Enviar Solicitação", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                    Text("Enviar Solicitação", style = MaterialTheme.typography.labelLarge, color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }

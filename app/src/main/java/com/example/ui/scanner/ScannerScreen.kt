@@ -216,7 +216,7 @@ fun ScannerScreen(
                                 .height(50.dp)
                                 .testTag("btn_request_camera")
                         ) {
-                            Text("Conceder Permissão", fontWeight = FontWeight.Bold)
+                            Text("Conceder Permissão", color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -420,7 +420,7 @@ fun ScannerScreen(
                                         .height(48.dp)
                                         .testTag("btn_submit_manual_barcode")
                                 ) {
-                                    Text("Consultar Código", fontWeight = FontWeight.Bold)
+                                    Text("Consultar Código", color = Color.White, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -517,19 +517,20 @@ private fun ResultCard(
                     .height(50.dp)
                     .testTag("btn_scanner_action")
             ) {
-                Text(actionButtonText, fontWeight = FontWeight.Bold)
+                Text(actionButtonText, color = Color.White, fontWeight = FontWeight.Bold)
             }
             
             if (secondaryActionButtonText != null && onSecondaryAction != null) {
                 OutlinedButton(
                     onClick = onSecondaryAction,
                     shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, AppColors.BorderStrong),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp)
                         .testTag("btn_scanner_secondary_action")
                 ) {
-                    Text(secondaryActionButtonText, fontWeight = FontWeight.Bold)
+                    Text(secondaryActionButtonText, color = AppColors.TextPrimary, fontWeight = FontWeight.Bold)
                 }
             }
         }

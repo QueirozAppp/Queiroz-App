@@ -1,10 +1,14 @@
 package com.example.ui.conference
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
-
-import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import com.example.core.util.ImageCompressionUtils
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -102,14 +106,49 @@ fun ConferenceDetailScreen(
     var selectedItemProductIdForEvidence by remember { mutableStateOf<String?>(null) }
     var previewEvidenceUrl by remember { mutableStateOf<String?>(null) }
 
+    var pendingEvidencePhotoUri by remember { mutableStateOf<Uri?>(null) }
+
     val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicturePreview()
-    ) { bitmap ->
-        if (bitmap != null) {
-            val stream = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 85, stream)
-            pendingImageBytes = stream.toByteArray()
-            showAddEvidenceDialog = true
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        val uri = pendingEvidencePhotoUri
+        if (success && uri != null) {
+            val bytes = ImageCompressionUtils.readOriginalBytesWithOrientation(context, uri)
+            if (bytes != null && bytes.isNotEmpty()) {
+                pendingImageBytes = bytes
+                showAddEvidenceDialog = true
+            } else {
+                Toast.makeText(context, "Falha ao ler foto capturada.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun launchEvidenceCameraDirectly() {
+        try {
+            val uri = ImageCompressionUtils.createCameraPhotoUri(context)
+            pendingEvidencePhotoUri = uri
+            cameraLauncher.launch(uri)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Não foi possível abrir a câmera: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val evidenceCameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            launchEvidenceCameraDirectly()
+        } else {
+            Toast.makeText(context, "Permissão da câmera necessária para anexar evidência.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun openEvidenceCameraSafely() {
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            launchEvidenceCameraDirectly()
+        } else {
+            evidenceCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
@@ -264,7 +303,7 @@ fun ConferenceDetailScreen(
                         onClick = {
                             evidenceDescriptionInput = ""
                             selectedItemProductIdForEvidence = null
-                            cameraLauncher.launch(null)
+                            openEvidenceCameraSafely()
                         },
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AppColors.Secondary),
@@ -274,9 +313,9 @@ fun ConferenceDetailScreen(
                             .padding(bottom = 4.dp)
                             .testTag("btn_add_evidence")
                     ) {
-                        Icon(Icons.Default.AddAPhoto, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.AddAPhoto, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Adicionar Foto de Evidência", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        Text("Adicionar Foto de Evidência", color = Color.White, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -445,18 +484,20 @@ fun ConferenceDetailScreen(
                             tint = AppColors.StatusDivergenceText
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Excluir / Cancelar Solicitação", fontWeight = FontWeight.Bold)
+                        Text("Excluir / Cancelar Solicitação", color = AppColors.StatusDivergenceText, fontWeight = FontWeight.Bold)
                     }
                 } else {
                     OutlinedButton(
                         onClick = onBackToList,
                         shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, AppColors.BorderStrong),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.TextPrimary),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp)
                             .testTag("btn_back_from_conference_detail")
                     ) {
-                        Text(backButtonLabel, style = MaterialTheme.typography.labelLarge)
+                        Text(backButtonLabel, color = AppColors.TextPrimary, style = MaterialTheme.typography.labelLarge)
                     }
                 }
             }
@@ -480,7 +521,8 @@ fun ConferenceDetailScreen(
         if (showAddEvidenceDialog) {
             AlertDialog(
                 onDismissRequest = { showAddEvidenceDialog = false },
-                title = { Text("Evidência Fotográfica", fontWeight = FontWeight.Bold) },
+                containerColor = AppColors.Surface,
+                title = { Text("Evidência Fotográfica", color = AppColors.TextPrimary, fontWeight = FontWeight.Bold) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
@@ -520,7 +562,7 @@ fun ConferenceDetailScreen(
                         colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
                         modifier = Modifier.testTag("btn_confirm_upload_evidence")
                     ) {
-                        Text("Confirmar Envio", fontWeight = FontWeight.Bold)
+                        Text("Confirmar Envio", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 },
                 dismissButton = {
@@ -528,7 +570,7 @@ fun ConferenceDetailScreen(
                         onClick = { showAddEvidenceDialog = false; pendingImageBytes = null },
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("Cancelar")
+                        Text("Cancelar", color = AppColors.TextPrimary)
                     }
                 }
             )
@@ -538,6 +580,7 @@ fun ConferenceDetailScreen(
         if (showConfirmDialog) {
             AlertDialog(
                 onDismissRequest = { showConfirmDialog = false },
+                containerColor = AppColors.Surface,
                 icon = {
                     Icon(
                         imageVector = if (hasDivergence) Icons.Default.Warning else Icons.Default.CheckCircle,
@@ -548,6 +591,7 @@ fun ConferenceDetailScreen(
                 title = {
                     Text(
                         text = if (hasDivergence) "Confirmar com Divergência?" else "Finalizar Conferência?",
+                        color = AppColors.TextPrimary,
                         fontWeight = FontWeight.Bold
                     )
                 },
@@ -591,7 +635,7 @@ fun ConferenceDetailScreen(
                         ),
                         modifier = Modifier.testTag("btn_confirm_finish")
                     ) {
-                        Text(if (hasDivergence) "Finalizar com Divergência" else "Finalizar Conferência", fontWeight = FontWeight.Bold)
+                        Text(if (hasDivergence) "Finalizar com Divergência" else "Finalizar Conferência", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 },
                 dismissButton = {
@@ -599,7 +643,7 @@ fun ConferenceDetailScreen(
                         onClick = { showConfirmDialog = false },
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("Cancelar")
+                        Text("Cancelar", color = AppColors.TextPrimary)
                     }
                 }
             )
@@ -609,6 +653,7 @@ fun ConferenceDetailScreen(
         if (showCancelDialog) {
             AlertDialog(
                 onDismissRequest = { showCancelDialog = false },
+                containerColor = AppColors.Surface,
                 icon = {
                     Icon(
                         imageVector = Icons.Default.Warning,
@@ -659,7 +704,7 @@ fun ConferenceDetailScreen(
                         colors = ButtonDefaults.buttonColors(containerColor = AppColors.StatusDivergence),
                         modifier = Modifier.testTag("btn_confirm_cancel_request")
                     ) {
-                        Text("Confirmar Exclusão", fontWeight = FontWeight.Bold)
+                        Text("Confirmar Exclusão", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 },
                 dismissButton = {
@@ -667,7 +712,7 @@ fun ConferenceDetailScreen(
                         onClick = { showCancelDialog = false },
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("Voltar")
+                        Text("Voltar", color = AppColors.TextPrimary)
                     }
                 }
             )
@@ -801,7 +846,8 @@ private fun CheckQuantityDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Conferência Física", fontWeight = FontWeight.Bold) },
+        containerColor = AppColors.Surface,
+        title = { Text("Conferência Física", color = AppColors.TextPrimary, fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Surface(
@@ -848,7 +894,7 @@ private fun CheckQuantityDialog(
                 colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
                 modifier = Modifier.testTag("btn_confirm_item_check")
             ) {
-                Text("Confirmar Item", fontWeight = FontWeight.Bold)
+                Text("Confirmar Item", color = Color.White, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
@@ -856,7 +902,7 @@ private fun CheckQuantityDialog(
                 onClick = onDismiss,
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Text("Cancelar")
+                Text("Cancelar", color = AppColors.TextPrimary)
             }
         }
     )

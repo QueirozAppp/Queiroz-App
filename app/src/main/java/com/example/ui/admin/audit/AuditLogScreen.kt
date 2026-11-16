@@ -286,7 +286,7 @@ fun AuditLogScreen(
                                         border = BorderStroke(1.dp, AppColors.BorderStrong),
                                         colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.Primary)
                                     ) {
-                                        Text("Carregar mais eventos")
+                                        Text("Carregar mais eventos", color = AppColors.Primary, fontWeight = FontWeight.SemiBold)
                                     }
                                 }
                             }
@@ -452,6 +452,7 @@ private fun AuditLogDetailDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = AppColors.Surface,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
@@ -514,7 +515,7 @@ private fun AuditLogDetailDialog(
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary)
             ) {
-                Text("Fechar", fontWeight = FontWeight.Bold)
+                Text("Fechar", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
     )
@@ -553,6 +554,7 @@ private fun AuditFiltersDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = AppColors.Surface,
         title = {
             Text(
                 text = "Filtrar Trilha de Auditoria",
@@ -624,7 +626,7 @@ private fun AuditFiltersDialog(
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary)
             ) {
-                Text("Aplicar", fontWeight = FontWeight.Bold)
+                Text("Aplicar", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
     )

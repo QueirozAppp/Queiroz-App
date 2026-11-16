@@ -130,12 +130,14 @@ fun AppPrimaryButton(
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
+                        tint = Color.White,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                 }
                 Text(
                     text = text,
+                    color = Color.White,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -176,12 +178,14 @@ fun AppOutlinedButton(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
+                    tint = contentColor,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
             }
             Text(
                 text = text,
+                color = contentColor,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold
             )
@@ -220,12 +224,14 @@ fun AppDangerButton(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
+                    tint = Color.White,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
             }
             Text(
                 text = text,
+                color = Color.White,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold
             )

@@ -147,7 +147,7 @@ class AppUpdateViewModel(
                         _uiState.update {
                             it.copy(
                                 isChecking = false,
-                                statusMessage = "Arquivo de versão não encontrado no servidor.",
+                                statusMessage = "Arquivo de versão não encontrado no servidor (404). Se o GitHub estiver Privado, altere para Público para o app acessar os releases.",
                                 isStatusError = true
                             )
                         }
@@ -214,6 +214,56 @@ class AppUpdateViewModel(
                     statusMessage = "Não consegui abrir o link de atualização.",
                     isStatusError = true
                 )
+            }
+        }
+    }
+
+    fun publishCloudUpdate(
+        version: String,
+        build: Int,
+        notes: String,
+        url: String
+    ) {
+        if (version.isBlank() || build <= 0) {
+            _uiState.update {
+                it.copy(
+                    statusMessage = "Informe uma versão e número de build válidos.",
+                    isStatusError = true
+                )
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(isChecking = true, statusMessage = null, isStatusError = false)
+            }
+            val info = com.example.core.update.RemoteVersionInfo(
+                version = version.trim(),
+                build = build,
+                notes = notes.trim(),
+                url = url.trim().ifBlank { com.example.core.update.AppUpdateConfig.FALLBACK_DOWNLOAD_URL }
+            )
+            val published = updateManager.publishVersionToFirestore(info)
+            if (published) {
+                val show = info.build > com.example.core.update.AppUpdateConfig.APP_BUILD
+                _uiState.update {
+                    it.copy(
+                        isChecking = false,
+                        availableUpdate = if (show) info else null,
+                        showBanner = show,
+                        statusMessage = "Versão ${info.version} (Build ${info.build}) publicada na nuvem.",
+                        isStatusError = false
+                    )
+                }
+            } else {
+                _uiState.update {
+                    it.copy(
+                        isChecking = false,
+                        statusMessage = "Não foi possível publicar a atualização na nuvem.",
+                        isStatusError = true
+                    )
+                }
             }
         }
     }

@@ -940,7 +940,7 @@ class ExampleRobolectricTest {
     @Test
     fun `app update manager detects newer build respects 6h interval and dismiss choice`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        context.getSharedPreferences("qrz_app_update_prefs", Context.MODE_PRIVATE).edit().clear().commit()
+        context.getSharedPreferences("qrz_app_update_prefs_guest", Context.MODE_PRIVATE).edit().clear().commit()
 
         var now = 1_000_000L
         var networkCalls = 0
@@ -957,7 +957,7 @@ class ExampleRobolectricTest {
             nowProvider = { now },
             fetcher = {
                 networkCalls++
-                remoteNewer
+                com.example.core.update.UpdateCheckOutcome.UpdateAvailable(remoteNewer)
             }
         )
 
@@ -988,17 +988,19 @@ class ExampleRobolectricTest {
     @Test
     fun `app update viewmodel manual check shows expected messages for up-to-date available and offline`() {
         val application = ApplicationProvider.getApplicationContext<Application>()
-        application.getSharedPreferences("qrz_app_update_prefs", Context.MODE_PRIVATE).edit().clear().commit()
+        application.getSharedPreferences("qrz_app_update_prefs_guest", Context.MODE_PRIVATE).edit().clear().commit()
         val dispatcher = kotlinx.coroutines.test.UnconfinedTestDispatcher()
         Dispatchers.setMain(dispatcher)
         try {
-            var nextResponse: com.example.core.update.RemoteVersionInfo? =
-                com.example.core.update.RemoteVersionInfo("1.2.0", 12, "Atual", "https://example.com/app.apk")
+            var nextOutcome: com.example.core.update.UpdateCheckOutcome =
+                com.example.core.update.UpdateCheckOutcome.UpToDate(
+                    com.example.core.update.RemoteVersionInfo("1.2.0", 12, "Atual", "https://example.com/app.apk")
+                )
 
             val manager = com.example.core.update.AppUpdateManager(
                 context = application,
                 currentBuild = 12,
-                fetcher = { nextResponse }
+                fetcher = { nextOutcome }
             )
             val viewModel = com.example.ui.update.AppUpdateViewModel(application, manager)
 
@@ -1009,15 +1011,16 @@ class ExampleRobolectricTest {
 
             // Versão disponível (mesmo que antes tivesse clicado "Depois")
             manager.dismissVersion(13)
-            nextResponse = com.example.core.update.RemoteVersionInfo("1.3.0", 13, "Correções", "https://example.com/app.apk")
+            val availableInfo = com.example.core.update.RemoteVersionInfo("1.3.0", 13, "Correções", "https://example.com/app.apk")
+            nextOutcome = com.example.core.update.UpdateCheckOutcome.UpdateAvailable(availableInfo)
             viewModel.checkManually()
             assertEquals("Versão 1.3.0 disponível.", viewModel.uiState.value.statusMessage)
             assertTrue(viewModel.uiState.value.showBanner)
 
             // Sem conexão
-            nextResponse = null
+            nextOutcome = com.example.core.update.UpdateCheckOutcome.Offline
             viewModel.checkManually()
-            assertEquals("Não consegui verificar. Confira a conexão.", viewModel.uiState.value.statusMessage)
+            assertEquals("Sem conexão com a internet. Confira o Wi-Fi.", viewModel.uiState.value.statusMessage)
             assertTrue(viewModel.uiState.value.isStatusError)
         } finally {
             Dispatchers.resetMain()
@@ -1035,7 +1038,7 @@ class ExampleRobolectricTest {
     @Test
     fun `main activity and viewmodel factory survive corrupted shared preferences on cold start`() {
         val context = ApplicationProvider.getApplicationContext<Application>()
-        context.getSharedPreferences("qrz_app_update_prefs", Context.MODE_PRIVATE)
+        context.getSharedPreferences("qrz_app_update_prefs_guest", Context.MODE_PRIVATE)
             .edit().putString("last_check_at", "corrupted").putString("dismissed_build", "bad").commit()
         context.getSharedPreferences("queiroz_avaria_theme_prefs", Context.MODE_PRIVATE)
             .edit().putInt("theme_mode", 999).commit()

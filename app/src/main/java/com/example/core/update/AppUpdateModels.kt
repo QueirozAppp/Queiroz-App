@@ -9,8 +9,10 @@ object AppUpdateConfig {
     const val APP_VERSION: String = "1.2.0"
     const val APP_BUILD: Int = 12
 
-    const val VERSION_JSON_URL: String =
-        "https://ais-dev-grvvjgjssysvkpoduefks4-708148426369.us-west2.run.app/version.json"
+    const val GITHUB_VERSION_URL: String =
+        "https://raw.githubusercontent.com/QueirozAppp/Queiroz-App/main/version.json"
+
+    const val VERSION_JSON_URL: String = GITHUB_VERSION_URL
 
     const val FALLBACK_DOWNLOAD_URL: String =
         "https://github.com/QueirozAppp/Queiroz-App/releases/latest/download/app-debug.apk"

@@ -402,9 +402,11 @@ fun LoginScreen(
         if (uiState.showForgotPasswordDialog) {
             AlertDialog(
                 onDismissRequest = viewModel::closeForgotPasswordDialog,
+                containerColor = AppColors.Surface,
                 title = {
                     Text(
                         text = "Redefinição de Senha",
+                        color = AppColors.TextPrimary,
                         fontWeight = FontWeight.Bold
                     )
                 },
@@ -456,7 +458,7 @@ fun LoginScreen(
                         if (uiState.isLoading) {
                             CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White)
                         } else {
-                            Text("Enviar Link", fontWeight = FontWeight.Bold)
+                            Text("Enviar Link", color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
                 },
@@ -465,7 +467,7 @@ fun LoginScreen(
                         onClick = viewModel::closeForgotPasswordDialog,
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("Fechar")
+                        Text("Fechar", color = AppColors.TextPrimary)
                     }
                 }
             )

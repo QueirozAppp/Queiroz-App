@@ -14,6 +14,7 @@ import java.net.URL
 import java.net.UnknownHostException
 import java.net.SocketTimeoutException
 import java.net.ConnectException
+import kotlinx.coroutines.tasks.await
 
 class AppUpdateManager(
     context: Context,
@@ -128,6 +129,52 @@ class AppUpdateManager(
         return getDismissedBuild() != info.build
     }
 
+    suspend fun fetchRemoteVersionFromFirestore(): RemoteVersionInfo? = withContext(Dispatchers.IO) {
+        try {
+            val db = com.example.core.firebase.FirebaseProvider.getFirestoreOrNull() ?: return@withContext null
+            val doc = db.collection("app_updates").document("latest").get().await()
+            if (doc.exists()) {
+                val data = doc.data ?: return@withContext null
+                val version = (data["version"] as? String) ?: ""
+                val build = when (val b = data["build"]) {
+                    is Number -> b.toInt()
+                    is String -> b.toIntOrNull() ?: 0
+                    else -> 0
+                }
+                val notes = (data["notes"] as? String) ?: ""
+                val url = (data["url"] as? String) ?: AppUpdateConfig.FALLBACK_DOWNLOAD_URL
+                if (version.isNotBlank() && build > 0) {
+                    return@withContext RemoteVersionInfo(
+                        version = version,
+                        build = build,
+                        notes = notes,
+                        url = url.ifBlank { AppUpdateConfig.FALLBACK_DOWNLOAD_URL }
+                    )
+                }
+            }
+            null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    suspend fun publishVersionToFirestore(info: RemoteVersionInfo): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val db = com.example.core.firebase.FirebaseProvider.getFirestoreOrNull() ?: return@withContext false
+            val map = hashMapOf(
+                "version" to info.version,
+                "build" to info.build,
+                "notes" to info.notes,
+                "url" to info.url,
+                "updatedAt" to System.currentTimeMillis()
+            )
+            db.collection("app_updates").document("latest").set(map).await()
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     suspend fun checkForUpdate(force: Boolean = false): UpdateCheckOutcome {
         val now = nowProvider()
         if (!force) {
@@ -147,7 +194,41 @@ class AppUpdateManager(
                 if (fetcher != null) {
                     fetcher.invoke(versionUrl)
                 } else {
-                    fetchRemoteVersionFromNetwork(versionUrl, now)
+                    // 1. Verificar Firestore primeiro (funciona independente do GitHub ser público ou privado)
+                    val firestoreInfo = fetchRemoteVersionFromFirestore()
+                    if (firestoreInfo != null && firestoreInfo.build > currentBuild) {
+                        UpdateCheckOutcome.UpdateAvailable(firestoreInfo)
+                    } else {
+                        // 2. Verificar HTTP (version.json no GitHub)
+                        var netOutcome = fetchRemoteVersionFromNetwork(versionUrl, now)
+                        if (netOutcome is UpdateCheckOutcome.HttpNotFound && versionUrl.contains("/main/")) {
+                            val masterUrl = versionUrl.replace("/main/", "/master/")
+                            netOutcome = fetchRemoteVersionFromNetwork(masterUrl, now)
+                        }
+
+                        // 3. Fallback para GitHub Releases API caso version.json não esteja atualizado/público
+                        if (netOutcome !is UpdateCheckOutcome.UpdateAvailable) {
+                            val releaseOutcome = fetchLatestGitHubRelease(now)
+                            if (releaseOutcome is UpdateCheckOutcome.UpdateAvailable) {
+                                netOutcome = releaseOutcome
+                            } else if (netOutcome is UpdateCheckOutcome.HttpNotFound && releaseOutcome is UpdateCheckOutcome.UpToDate) {
+                                netOutcome = releaseOutcome
+                            }
+                        }
+
+                        if (netOutcome is UpdateCheckOutcome.UpdateAvailable) {
+                            netOutcome
+                        } else if (firestoreInfo != null) {
+                            // Se Firestore já está configurado e não há build superior no GitHub, respeita status do Firestore
+                            if (firestoreInfo.build > currentBuild) {
+                                UpdateCheckOutcome.UpdateAvailable(firestoreInfo)
+                            } else {
+                                UpdateCheckOutcome.UpToDate(firestoreInfo)
+                            }
+                        } else {
+                            netOutcome
+                        }
+                    }
                 }
             }
         } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
@@ -167,6 +248,73 @@ class AppUpdateManager(
         }
 
         return outcome
+    }
+
+    private suspend fun fetchLatestGitHubRelease(timestamp: Long): UpdateCheckOutcome = withContext(Dispatchers.IO) {
+        var connection: HttpURLConnection? = null
+        try {
+            val apiUrl = "https://api.github.com/repos/QueirozAppp/Queiroz-App/releases/latest?_ts=$timestamp"
+            connection = (URL(apiUrl).openConnection() as? HttpURLConnection)?.apply {
+                requestMethod = "GET"
+                connectTimeout = AppUpdateConfig.REQUEST_TIMEOUT_MS
+                readTimeout = AppUpdateConfig.REQUEST_TIMEOUT_MS
+                useCaches = false
+                setRequestProperty("User-Agent", "QRZ-Stock-Android-App")
+                setRequestProperty("Accept", "application/vnd.github+json")
+            } ?: return@withContext UpdateCheckOutcome.Offline
+
+            val code = connection.responseCode
+            if (code == 404) return@withContext UpdateCheckOutcome.HttpNotFound(apiUrl)
+            if (code !in 200..299) return@withContext UpdateCheckOutcome.HttpError(code)
+
+            val body = BufferedReader(InputStreamReader(connection.inputStream)).use { it.readText() }
+            val obj = JSONObject(body)
+            val tagName = obj.optString("tag_name", "").trim()
+            val releaseName = obj.optString("name", "").trim()
+            val notes = obj.optString("body", "").trim().take(300)
+            val assets = obj.optJSONArray("assets")
+            var downloadUrl = AppUpdateConfig.FALLBACK_DOWNLOAD_URL
+            if (assets != null && assets.length() > 0) {
+                val apkAsset = (0 until assets.length())
+                    .map { assets.getJSONObject(it) }
+                    .firstOrNull { it.optString("name").endsWith(".apk", ignoreCase = true) }
+                val assetUrl = apkAsset?.optString("browser_download_url", "")?.trim()
+                if (!assetUrl.isNullOrBlank()) downloadUrl = assetUrl
+            }
+
+            // Extrai o número de build de "(Build 13)", "build: 13" ou sufixo numérico da tag
+            val buildRegex = Regex("""build[:\s#]*([0-9]+)""", RegexOption.IGNORE_CASE)
+            val parsedBuild = buildRegex.find(releaseName)?.groupValues?.getOrNull(1)?.toIntOrNull()
+                ?: buildRegex.find(notes)?.groupValues?.getOrNull(1)?.toIntOrNull()
+                ?: tagName.removePrefix("v").removePrefix("V")
+                    .split('.', '-', '_')
+                    .lastOrNull()
+                    ?.toIntOrNull()
+                ?: 0
+
+            val cleanVersion = tagName.removePrefix("v").removePrefix("V").ifBlank { releaseName }
+            if (cleanVersion.isBlank() || parsedBuild <= 0) {
+                return@withContext UpdateCheckOutcome.InvalidJson
+            }
+
+            val remoteInfo = RemoteVersionInfo(
+                version = cleanVersion,
+                build = parsedBuild,
+                notes = notes.ifBlank { releaseName },
+                url = downloadUrl
+            )
+            if (remoteInfo.build > currentBuild) {
+                UpdateCheckOutcome.UpdateAvailable(remoteInfo)
+            } else {
+                UpdateCheckOutcome.UpToDate(remoteInfo)
+            }
+        } catch (_: Exception) {
+            UpdateCheckOutcome.Offline
+        } finally {
+            try {
+                connection?.disconnect()
+            } catch (_: Exception) {}
+        }
     }
 
     private fun classifyException(e: Exception): UpdateCheckOutcome {

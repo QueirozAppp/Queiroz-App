@@ -301,14 +301,15 @@ private fun StatusFilterChips(selectedStatus: String, onStatusSelected: (String)
                 label = {
                     Text(
                         text = label,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                        color = if (isSelected) AppColors.Primary else AppColors.TextPrimary,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                     )
                 },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = AppColors.PrimaryContainer,
                     selectedLabelColor = AppColors.Primary,
                     containerColor = AppColors.Surface,
-                    labelColor = AppColors.TextSecondary
+                    labelColor = AppColors.TextPrimary
                 ),
                 border = FilterChipDefaults.filterChipBorder(
                     enabled = true,

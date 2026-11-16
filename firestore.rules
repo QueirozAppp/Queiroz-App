@@ -84,6 +84,12 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Regras de Atualizações do Aplicativo
+    match /app_updates/{docId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
     // Default deny para qualquer outra coleção não especificada
     match /{document=**} {
       allow read, write: if false;
