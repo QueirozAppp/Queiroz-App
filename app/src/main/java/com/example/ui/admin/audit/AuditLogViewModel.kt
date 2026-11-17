@@ -149,8 +149,13 @@ class AuditLogViewModel(
                 log.userName.lowercase().contains(query) ||
                 log.userId.lowercase().contains(query) ||
                 log.entityId.lowercase().contains(query) ||
+                log.storeId.lowercase().contains(query) ||
+                log.sectorId.lowercase().contains(query) ||
                 log.description.lowercase().contains(query) ||
-                log.action.lowercase().contains(query)
+                log.action.lowercase().contains(query) ||
+                AuditLogFormatter.formatActionTitle(log.action).lowercase().contains(query) ||
+                AuditLogFormatter.formatEntityType(log.entityType).lowercase().contains(query) ||
+                AuditLogFormatter.formatRole(log.userRole).lowercase().contains(query)
             }
         }
 

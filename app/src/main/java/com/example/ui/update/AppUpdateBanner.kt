@@ -92,14 +92,6 @@ fun AppUpdateBanner(
                 )
             }
 
-            if (updateInfo.notes.isNotBlank()) {
-                Text(
-                    text = updateInfo.notes,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AppColors.TextSecondary
-                )
-            }
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
@@ -305,15 +297,6 @@ fun CheckUpdateSectionCard(
             }
 
             if (availableUpdate != null && onUpdateNowClick != null) {
-                if (availableUpdate.notes.isNotBlank()) {
-                    Text(
-                        text = availableUpdate.notes,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AppColors.TextSecondary,
-                        modifier = Modifier.testTag("text_card_update_notes")
-                    )
-                }
-
                 Button(
                     onClick = onUpdateNowClick,
                     shape = RoundedCornerShape(12.dp),

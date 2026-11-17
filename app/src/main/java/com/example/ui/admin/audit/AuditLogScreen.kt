@@ -18,8 +18,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
@@ -58,8 +60,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.core.model.AuditAction
 import com.example.core.model.AuditEntityType
@@ -166,7 +169,7 @@ fun AuditLogScreen(
             OutlinedTextField(
                 value = uiState.searchQuery,
                 onValueChange = viewModel::onSearchQueryChanged,
-                placeholder = { Text("Pesquisar por usuário, ação, ID ou descrição...", color = AppColors.TextTertiary) },
+                placeholder = { Text("Pesquisar por pessoa, ação, loja ou detalhe...", color = AppColors.TextTertiary) },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Search,
@@ -208,20 +211,22 @@ fun AuditLogScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = "Filtros: ${listOfNotNull(
-                                if (uiState.filterRole != "ALL") "Papel: ${uiState.filterRole}" else null,
+                                if (uiState.filterRole != "ALL") "Perfil: ${AuditLogFormatter.formatRole(uiState.filterRole)}" else null,
                                 if (uiState.filterStoreId != "ALL") "Loja: ${uiState.filterStoreId}" else null,
-                                if (uiState.filterAction != "ALL") "Ação: ${uiState.filterAction}" else null,
-                                if (uiState.filterEntityType != "ALL") "Entidade: ${uiState.filterEntityType}" else null
+                                if (uiState.filterAction != "ALL") "Ação: ${AuditLogFormatter.formatActionTitle(uiState.filterAction)}" else null,
+                                if (uiState.filterEntityType != "ALL") "Tipo: ${AuditLogFormatter.formatEntityType(uiState.filterEntityType)}" else null
                             ).joinToString(" • ")}",
                             style = MaterialTheme.typography.bodySmall,
                             color = AppColors.Primary,
                             fontWeight = FontWeight.SemiBold,
-                            maxLines = 1
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
                         )
                         TextButton(onClick = {
                             viewModel.onFilterRoleChanged("ALL")
@@ -343,9 +348,20 @@ private fun AuditLogCard(
     log: AuditLog,
     onClick: () -> Unit
 ) {
-    val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy • HH:mm:ss", Locale.getDefault()) }
+    val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy • HH:mm", Locale.getDefault()) }
     val formattedDate = remember(log.timestamp) {
         if (log.timestamp > 0) dateFormat.format(Date(log.timestamp)) else "Sem data"
+    }
+    val actionTitle = remember(log.action) { AuditLogFormatter.formatActionTitle(log.action) }
+    val entityLabel = remember(log.entityType, log.entityId) {
+        "${AuditLogFormatter.formatEntityType(log.entityType)} ${AuditLogFormatter.formatReferenceCode(log.entityId)}"
+    }
+    val roleLabel = remember(log.userRole) { AuditLogFormatter.formatRole(log.userRole) }
+    val friendlyDescription = remember(log.id, log.description, log.action) {
+        AuditLogFormatter.formatDescription(log)
+    }
+    val locationText = remember(log.storeId, log.sectorId, log.entityType) {
+        AuditLogFormatter.formatLocation(log)
     }
 
     Card(
@@ -358,18 +374,22 @@ private fun AuditLogCard(
             .clickable(onClick = onClick)
             .testTag("audit_card_${log.id}")
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            // Header: Date & Role
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            // Data e Perfil do Usuário
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = formattedDate,
                     style = MaterialTheme.typography.bodySmall,
                     color = AppColors.TextTertiary,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f)
                 )
                 Surface(
                     shape = RoundedCornerShape(6.dp),
@@ -380,10 +400,12 @@ private fun AuditLogCard(
                     }
                 ) {
                     Text(
-                        text = log.userRole,
+                        text = roleLabel,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false,
                         color = when (log.userRole) {
                             "ADMIN" -> AppColors.StatusDivergenceText
                             "AVARISTA" -> AppColors.Primary
@@ -393,71 +415,66 @@ private fun AuditLogCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            // Ação em linguagem simples
+            Text(
+                text = actionTitle,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = AppColors.TextPrimary
+            )
 
-            // Action Badge & Entity
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // Tipo e código curto do item
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = AppColors.SurfaceVariant
             ) {
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = AppColors.SurfaceVariant
-                ) {
-                    Text(
-                        text = log.action,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = AppColors.TextPrimary
-                    )
-                }
                 Text(
-                    text = "${log.entityType} #${log.entityId.take(8)}",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = entityLabel,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
                     color = AppColors.Primary,
-                    fontWeight = FontWeight.SemiBold
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // User info & Description
+            // Quem fez e o que aconteceu
             Text(
-                text = "Por: ${log.userName.ifBlank { log.userId }}",
+                text = "Feito por: ${log.userName.ifBlank { "Sistema" }}",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = AppColors.TextPrimary
             )
 
-            if (log.description.isNotBlank()) {
-                Text(
-                    text = log.description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AppColors.TextSecondary,
-                    maxLines = 2
-                )
-            }
+            Text(
+                text = friendlyDescription,
+                style = MaterialTheme.typography.bodySmall,
+                color = AppColors.TextSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
 
-            if (log.storeId.isNotBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Loja: ${log.storeId}" + if (log.sectorId.isNotBlank()) " | Setor: ${log.sectorId}" else "",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AppColors.TextTertiary
-                    )
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = "Ver Detalhes",
-                        tint = AppColors.TextTertiary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+            // Local e seta de detalhes
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = locationText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AppColors.TextTertiary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "Ver Detalhes",
+                    tint = AppColors.TextTertiary,
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }
@@ -468,10 +485,25 @@ private fun AuditLogDetailDialog(
     log: AuditLog,
     onDismiss: () -> Unit
 ) {
-    val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()) }
+    val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy 'às' HH:mm:ss", Locale.getDefault()) }
     val formattedDate = remember(log.timestamp) {
-        if (log.timestamp > 0) dateFormat.format(Date(log.timestamp)) else "Sem data"
+        if (log.timestamp > 0) dateFormat.format(Date(log.timestamp)) else "Sem data registrada"
     }
+    val actionTitle = remember(log.action) { AuditLogFormatter.formatActionTitle(log.action) }
+    val entityLabel = remember(log.entityType, log.entityId) {
+        "${AuditLogFormatter.formatEntityType(log.entityType)} (${AuditLogFormatter.formatReferenceCode(log.entityId)})"
+    }
+    val roleLabel = remember(log.userRole) { AuditLogFormatter.formatRole(log.userRole) }
+    val friendlyDescription = remember(log.id, log.description, log.action) {
+        AuditLogFormatter.formatDescription(log)
+    }
+    val locationText = remember(log.storeId, log.sectorId, log.entityType) {
+        AuditLogFormatter.formatLocation(log)
+    }
+    val friendlyMetadata = remember(log.metadata) {
+        AuditLogFormatter.formatFriendlyMetadata(log.metadata)
+    }
+    var showTechnicalIds by remember(log.id) { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -480,7 +512,7 @@ private fun AuditLogDetailDialog(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(34.dp)
                         .background(AppColors.PrimaryContainer, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
@@ -493,7 +525,7 @@ private fun AuditLogDetailDialog(
                 }
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = "Detalhes do Evento",
+                    text = "Resumo do Registro",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = AppColors.TextPrimary
@@ -502,32 +534,84 @@ private fun AuditLogDetailDialog(
         },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                DetailRow(label = "ID do Evento", value = log.id)
-                DetailRow(label = "Data e Hora", value = formattedDate)
-                DetailRow(label = "Ação Executada", value = log.action)
-                DetailRow(label = "Entidade", value = log.entityType)
-                DetailRow(label = "ID do Objeto", value = log.entityId)
-                DetailRow(label = "Usuário", value = log.userName.ifBlank { log.userId })
-                DetailRow(label = "UID", value = log.userId)
-                DetailRow(label = "Papel (Role)", value = log.userRole)
-                DetailRow(label = "Loja", value = log.storeId.ifBlank { "N/A" })
-                DetailRow(label = "Setor", value = log.sectorId.ifBlank { "N/A" })
-                DetailRow(label = "Descrição", value = log.description.ifBlank { "Sem descrição adicional" })
+                // Bloco de destaque explicando de forma direta o que aconteceu
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = AppColors.PrimaryContainer.copy(alpha = 0.65f),
+                    border = BorderStroke(1.dp, AppColors.Primary.copy(alpha = 0.25f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = actionTitle,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = AppColors.Primary
+                        )
+                        Text(
+                            text = friendlyDescription,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AppColors.TextPrimary
+                        )
+                    }
+                }
 
-                if (log.metadata.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(6.dp))
+                DetailRow(
+                    label = "Quem fez",
+                    value = "${log.userName.ifBlank { "Sistema" }} ($roleLabel)"
+                )
+                DetailRow(label = "Quando", value = formattedDate)
+                DetailRow(label = "Onde", value = locationText)
+                DetailRow(label = "Tipo de item", value = entityLabel)
+
+                if (friendlyMetadata.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Metadados da Operação:",
+                        text = "Detalhes da Operação:",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = AppColors.Primary
                     )
                     HorizontalDivider(color = AppColors.BorderSubtle)
-                    log.metadata.forEach { (key, value) ->
-                        DetailRow(label = "  • $key", value = value)
+                    friendlyMetadata.forEach { item ->
+                        DetailRow(label = item.label, value = item.value)
+                    }
+                }
+
+                TextButton(
+                    onClick = { showTechnicalIds = !showTechnicalIds },
+                    modifier = Modifier.align(Alignment.Start)
+                ) {
+                    Text(
+                        text = if (showTechnicalIds) "Ocultar códigos técnicos" else "Ver códigos técnicos",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AppColors.TextTertiary
+                    )
+                }
+
+                if (showTechnicalIds) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = AppColors.SurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            DetailRow(label = "Código do Evento", value = log.id)
+                            DetailRow(label = "Código do Item", value = log.entityId.ifBlank { "—" })
+                            DetailRow(label = "ID do Usuário", value = log.userId.ifBlank { "—" })
+                            DetailRow(label = "Código da Ação", value = log.action)
+                        }
                     }
                 }
             }
@@ -548,19 +632,22 @@ private fun AuditLogDetailDialog(
 private fun DetailRow(label: String, value: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.SemiBold,
-            color = AppColors.TextSecondary
+            color = AppColors.TextSecondary,
+            modifier = Modifier.weight(0.42f)
         )
-        Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = value,
             style = MaterialTheme.typography.bodySmall,
-            color = AppColors.TextPrimary
+            color = AppColors.TextPrimary,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(0.58f)
         )
     }
 }
@@ -573,14 +660,23 @@ private fun AuditFiltersDialog(
     onDismiss: () -> Unit
 ) {
     val roles = listOf("ALL", "ADMIN", "AVARISTA", "SETOR_LEADER")
-    val entityTypes = listOf("ALL", AuditEntityType.WITHDRAWAL_REQUEST, AuditEntityType.EVIDENCE, AuditEntityType.USER, AuditEntityType.STORE, AuditEntityType.SECTOR, AuditEntityType.PRODUCT, AuditEntityType.PRODUCT_REQUEST)
+    val entityTypes = listOf(
+        "ALL",
+        AuditEntityType.WITHDRAWAL_REQUEST,
+        AuditEntityType.EVIDENCE,
+        AuditEntityType.USER,
+        AuditEntityType.STORE,
+        AuditEntityType.SECTOR,
+        AuditEntityType.PRODUCT,
+        AuditEntityType.PRODUCT_REQUEST
+    )
 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = AppColors.Surface,
         title = {
             Text(
-                text = "Filtrar Trilha de Auditoria",
+                text = "Filtrar Registros",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = AppColors.TextPrimary
@@ -588,36 +684,52 @@ private fun AuditFiltersDialog(
         },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Role filter
-                Text("Papel do Usuário:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    roles.forEach { role ->
-                        val selected = uiState.filterRole == role
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (selected) AppColors.Primary else AppColors.SurfaceVariant,
-                            modifier = Modifier
-                                .clickable { viewModel.onFilterRoleChanged(role) }
-                                .padding(2.dp)
-                        ) {
-                            Text(
-                                text = if (role == "ALL") "Todos" else role,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (selected) Color.White else AppColors.TextSecondary,
-                                fontWeight = FontWeight.Bold
-                            )
+                Text(
+                    text = "Perfil de quem fez:",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = AppColors.TextPrimary
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    roles.chunked(2).forEach { rowRoles ->
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            rowRoles.forEach { role ->
+                                val selected = uiState.filterRole == role
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (selected) AppColors.Primary else AppColors.SurfaceVariant,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { viewModel.onFilterRoleChanged(role) }
+                                ) {
+                                    Text(
+                                        text = if (role == "ALL") "Todos" else AuditLogFormatter.formatRole(role),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (selected) Color.White else AppColors.TextPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
                         }
                     }
                 }
 
-                // Entity Type filter
-                Spacer(modifier = Modifier.height(4.dp))
-                Text("Tipo de Entidade:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Tipo de atividade:",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = AppColors.TextPrimary
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     entityTypes.chunked(2).forEach { rowEntities ->
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             rowEntities.forEach { entity ->
@@ -630,11 +742,13 @@ private fun AuditFiltersDialog(
                                         .clickable { viewModel.onFilterEntityTypeChanged(entity) }
                                 ) {
                                     Text(
-                                        text = if (entity == "ALL") "Todas as Entidades" else entity,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
+                                        text = if (entity == "ALL") "Todas" else AuditLogFormatter.formatEntityType(entity),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = if (selected) Color.White else AppColors.TextSecondary,
-                                        fontWeight = FontWeight.Bold
+                                        color = if (selected) Color.White else AppColors.TextPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
