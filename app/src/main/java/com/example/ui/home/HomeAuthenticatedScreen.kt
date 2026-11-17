@@ -143,13 +143,14 @@ fun HomeAuthenticatedScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        val logoRes = if (AppColors.isDark) R.drawable.logo_qrz_stock else R.drawable.logo_qrz_stock_light
                         Box(
                             modifier = Modifier
                                 .width(78.dp)
                                 .height(36.dp)
                         ) {
                             Image(
-                                painter = painterResource(id = R.drawable.logo_qrz_stock),
+                                painter = painterResource(id = logoRes),
                                 contentDescription = "Logo QRZ Stock",
                                 contentScale = ContentScale.Fit,
                                 modifier = Modifier.fillMaxSize()
