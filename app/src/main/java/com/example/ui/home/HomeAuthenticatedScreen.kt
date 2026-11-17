@@ -8,6 +8,7 @@ import com.example.core.data.ProductRegistrationRepository
 import com.example.core.data.RequestStatusCounts
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -63,13 +64,17 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.R
 import com.example.core.model.UserProfile
 import com.example.core.model.UserRole
 import com.example.core.update.AppUpdateUiState
@@ -140,29 +145,24 @@ fun HomeAuthenticatedScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
-                                .background(AppColors.Primary, RoundedCornerShape(8.dp)),
-                            contentAlignment = Alignment.Center
+                                .width(78.dp)
+                                .height(36.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Inventory2,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
+                            Image(
+                                painter = painterResource(id = R.drawable.logo_qrz_stock),
+                                contentDescription = "Logo QRZ Stock",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize()
                             )
                         }
                         Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = "QRZ Stock",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = AppColors.TextPrimary
-                            )
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Gestão Operacional de Avarias",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = AppColors.TextTertiary
+                                color = AppColors.TextTertiary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
